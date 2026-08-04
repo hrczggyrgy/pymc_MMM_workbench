@@ -1,38 +1,63 @@
 # PyMC MMM Workbench
 
-A production-quality Streamlit workbench for Bayesian Marketing Mix Modeling. Explore adstock and saturation interactively, fit a real PyMC Bayesian model with full posterior uncertainty, test what-if scenarios, and optimize budget allocation — all in a guided, educational interface.
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![Streamlit](https://img.shields.io/badge/streamlit-1.35%2B-red?logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![PyMC](https://img.shields.io/badge/pymc-5.16%2B-orange?logo=pymc&logoColor=white)](https://www.pymc.io/)
+[![ArviZ](https://img.shields.io/badge/arviz-1.2%2B-yellow?logo=arviz&logoColor=white)](https://arviz-devs.github.io/arviz/)
+[![Plotly](https://img.shields.io/badge/plotly-5.18%2B-3F4F75?logo=plotly&logoColor=white)](https://plotly.com/python/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Tests](https://img.shields.io/github/actions/workflow/status/hrczggyrgy/pymc_MMM_workbench/ci.yml?branch=main&logo=github-actions&logoColor=white)](https://github.com/hrczggyrgy/pymc_MMM_workbench/actions/workflows/ci.yml)
+[![Code Style](https://img.shields.io/badge/code%20style-ruff-000000?logo=ruff&logoColor=white)](https://github.com/astral-sh/ruff)
+[![Deploy](https://img.shields.io/badge/deploy-Streamlit_Cloud-brightgreen?logo=streamlit&logoColor=white)](https://pymcmmmworkbench.streamlit.app/)
 
-![Python](https://img.shields.io/badge/python-3.11%2B-blue)
-![Streamlit](https://img.shields.io/badge/streamlit-1.35%2B-red)
-![PyMC](https://img.shields.io/badge/pymc-5.16%2B-orange)
-![License](https://img.shields.io/badge/license-MIT-green)
+---
 
-## Features
+A production-quality **Streamlit workbench** for **Bayesian Marketing Mix Modeling**. Explore adstock and saturation interactively, fit a real PyMC Bayesian model with full posterior uncertainty, test what-if scenarios, and optimize budget allocation — all in a guided, educational interface.
 
-| Page | Purpose |
-|------|---------|
-| **Home** | Guided overview, workflow, glossary, and quick start |
-| **Data** | CSV upload, schema detection, validation, quick visualizations |
-| **Effect Explorer** | Interactive adstock/saturation curves with live parameter sliders |
-| **Model** | Bayesian MMM with PyMC — posterior summaries, diagnostics, trace plots, out-of-sample validation |
-| **Scenarios** | What-if spend changes with full posterior lift distributions |
-| **Optimization** | Constrained budget allocation maximizing expected outcome |
+[**Live Demo →**](https://pymcmmmworkbench.streamlit.app/) **|** [**Documentation**](#workflow-guide) **|** [**Bug**](https://github.com/hrczggyrgy/pymc_MMM_workbench/issues) **|** [**Feature**](https://github.com/hrczggyrgy/pymc_MMM_workbench/issues)
 
-### Key Capabilities
+---
 
-- **Real Bayesian inference** via PyMC (NUTS sampler, 2 chains, R-hat/ESS diagnostics)
-- **Per-channel adstock (geometric carryover)** and **Hill saturation (diminishing returns)** with interactive exploration
-- **Full posterior uncertainty** propagated to predictions, scenarios, and optimization
-- **Demo mode** with realistic synthetic data (104 weeks, 4 channels, controls, seasonality)
-- **Constraint-aware optimization** (SLSQP with bounds + equality constraint)
-- **Out-of-sample validation** with holdout metrics (RMSE, MAPE, R²)
-- **Model caching** with `st.cache_resource` for instant re-runs on same config
-- **Exportable results** (CSV allocation, posterior summaries)
+## Features at a Glance
 
-## Quick Start
+| Page | Purpose | Key Features |
+|------|---------|--------------|
+| Home | Guided overview | Workflow cards, glossary, quick start |
+| Data | Load & validate | CSV upload, schema detection, validation, sparklines |
+| Effect Explorer | Learn transformations | Interactive adstock/saturation curves, presets, marginal response |
+| Model | Fit Bayesian MMM | Per-channel parameters, holdout validation, diagnostics |
+| Scenarios | What-if analysis | Spend changes with posterior lift, credible intervals |
+| Optimization | Budget allocation | Risk-aware optimization, ROI/ROAS, sensitivity curves |
+
+---
+
+## Screenshots
+
+### Effect Explorer — Interactive Adstock & Saturation
+![Effect Explorer](docs/screenshots/effect_explorer.png)
+*Interactive sliders for adstock decay, saturation strength, and midpoint with live curve updates*
+
+### Model — Bayesian Fitting & Diagnostics
+![Model Page](docs/screenshots/model_page.png)
+*Per-channel parameters, holdout validation, posterior summaries, trace plots, residuals*
+
+### Scenarios — What-If Analysis
+![Scenarios Page](docs/screenshots/scenarios_page.png)
+*Per-channel spend sliders, posterior lift distributions, channel-level decomposition*
+
+### Optimization — Risk-Aware Budget Allocation
+![Optimization Page](docs/screenshots/optimization_page.png)
+*Budget constraints, risk-aversion slider, ROI/marginal ROAS, sensitivity analysis*
+
+> **Note:** Screenshots are placeholders. Replace `docs/screenshots/*.png` with actual captures.
+
+---
+
+## Live Demo Quick Start
 
 ```bash
 # Clone and enter directory
+git clone https://github.com/hrczggyrgy/pymc_MMM_workbench.git
 cd pymc_MMM_workbench
 
 # Create virtual environment
@@ -46,18 +71,20 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Open http://localhost:8501 — click **"Try Demo Data"** on the Home page to see the full workflow instantly.
+Open **http://localhost:8501** → Click **"Try Demo Data"** on the Home page to see the full workflow instantly.
 
 **Live demo:** https://pymcmmmworkbench.streamlit.app/
 
-## Data Format
+---
+
+## Data Format Data Format
 
 Prepare a CSV with:
 
 | Column Type | Example Names | Required |
 |-------------|---------------|----------|
-| Date | `date`, `week`, `ds` | Yes |
-| Target | `sales`, `revenue`, `conversions` | Yes |
+| Date | `date`, `week`, `ds` | ✅ Yes |
+| Target | `sales`, `revenue`, `conversions` | ✅ Yes |
 | Channel Spends | `search`, `social`, `video`, `display`, `tv`, `radio` | ≥2 |
 | Controls (optional) | `price`, `promo`, `holiday` | No |
 
@@ -67,30 +94,30 @@ Prepare a CSV with:
 - **Spend ≥ 0** (negative values flagged)
 
 ### Example CSV
-
 ```csv
 date,sales,search,social,video,display,price,promo
 2024-01-07,55000,12000,8000,15000,3000,99.5,0
 2024-01-14,56200,11500,8200,14800,3100,99.5,0
 2024-01-21,57100,13000,9000,16000,2900,98.0,1
-...
 ```
 
-## Workflow Guide
+---
 
-### 1. Data → Load & Validate
+## Workflow Guide Workflow Guide
+
+### 1 Data → Load & Validate
 - Upload CSV or click **Try Demo Data**
 - Auto-detects date/target/channels/controls
 - Review validation warnings (missing values, duplicates, negative spend, short series)
 - Save configuration
 
-### 2. Effect Explorer → Understand Transformations
+### 2 Effect Explorer → Understand Transformations
 - Select a channel
 - Adjust **adstock decay** (carryover), **window**, **saturation strength**, **midpoint**
 - See live: raw spend → adstocked → saturated → marginal response
 - Presets for Search/Video/Display profiles
 
-### 3. Model → Fit Bayesian MMM
+### 3 Model → Fit Bayesian MMM
 - Configure per-channel decay/strength (or use shared defaults)
 - Set prior strength, seasonality, carryover window
 - Choose holdout fraction for out-of-sample validation
@@ -104,7 +131,7 @@ date,sales,search,social,video,display,price,promo
   - Stacked contribution over time
   - Sampling diagnostics (trace plots, pair plots, residuals)
 
-### 4. Scenarios → Test What-If Questions
+### 4 Scenarios → Test What-If Questions
 - Adjust per-channel % change from baseline
 - Quick presets: +10% all, shift to video, cut display, fixed budget rebalance
 - See:
@@ -114,9 +141,10 @@ date,sales,search,social,video,display,price,promo
   - Response curves with baseline/scenario markers
 - Save scenarios for comparison
 
-### 5. Optimization → Allocate Budget
+### 5 Optimization → Allocate Budget
 - Set total budget and per-channel min/max constraints
 - Presets: ±25%, ±50%, wide, tight
+- Choose risk aversion (λ = 0 to 1)
 - Click **Find Recommended Allocation**
 - Results:
   - Current vs recommended allocation table + chart
@@ -126,7 +154,9 @@ date,sales,search,social,video,display,price,promo
   - Budget sensitivity curve (outcome vs total budget)
 - Download CSV
 
-## Architecture
+---
+
+## Architecture Architecture
 
 ```
 pymc_MMM_workbench/
@@ -149,59 +179,59 @@ pymc_MMM_workbench/
 │   ├── transformations.py    # Adstock, saturation, marginal response
 │   ├── modeling.py           # PyMC model, fitting, predictions (cached)
 │   ├── optimization.py       # Budget optimization, ROI, response curves
-│   └── plotting.py           # Plotly chart builders (cached)
+│   └── plotting.py           # Plotly chart builders
 ├── .streamlit/config.toml    # Streamlit theme & server config
+├── .github/
+│   ├── workflows/ci.yml      # CI pipeline
+│   └── ISSUE_TEMPLATE/       # Bug & feature templates
+├── tests/                    # Unit tests (38 tests)
+├── runtime.txt               # Python 3.11 for Streamlit Cloud
+├── requirements.txt          # Pinned dependencies
+├── requirements-lock.txt     # Frozen pip freeze for reproducibility
+├── LICENSE                   # MIT License
+├── CHANGELOG.md              # Version history
+├── CONTRIBUTING.md           # Contribution guidelines
 └── .gitignore
 ```
 
-### Core Modules
+---
 
-| Module | Responsibility |
-|--------|----------------|
-| `simulation.py` | `generate_demo_data()` — realistic synthetic MMM data |
-| `transformations.py` | `geometric_adstock()`, `hill_saturation()`, `marginal_response()` |
-| `modeling.py` | `fit_bayesian_mmm()`, `fit_bayesian_mmm_cached()`, `scenario_lift()`, `response_samples()` |
-| `optimization.py` | `optimize_budget()`, `compute_channel_roi()`, `response_curve_data()` |
-| `data.py` | CSV loading, schema detection, validation |
-| `plotting.py` | Reusable Plotly figures with `@st.cache_data` |
+## Model Specification Model Specification
 
-## Model Specification
-
-**Likelihood:**
+### Likelihood
 ```
 sales_t ~ Normal(μ_t, σ)
 ```
 
-**Linear Predictor:**
+### Linear Predictor
 ```
 μ_t = α + Σ_c β_c · f_c(spend_c,t) + γ · controls_t + δ · trend_t + seasonality_t
 ```
 
-**Media Transformation (fixed hyperparameters, not estimated):**
+### Media Transformation (fixed hyperparameters, not estimated)
 ```
 f_c(spend) = Hill( Adstock(spend; λ_c, L) ; α_c, midpoint_c )
 Adstock(spend; λ, L) = Σ_{k=0}^L λ^k · spend_{t-k}
 Hill(x; α, m) = x^α / (x^α + m^α)
 ```
 
-**Priors:**
+### Priors
 ```
 α ~ Normal(0, 1.5)                    # Intercept (standardized scale)
 β_c ~ Normal(0, prior_scale)          # Channel coefficients (standardized scale)
 σ ~ HalfNormal(1)                     # Observation noise
 ```
 
-**Out-of-sample validation:**
+### Out-of-Sample Validation
 - Chronological train/test split (last `test_size` fraction)
 - Posterior predictive on test set via `sample_posterior_predictive`
 - Metrics: RMSE, MAPE, R² on held-out data
 
-**Notes:**
-- Adstock/saturation parameters (λ, α, midpoint) are **fixed hyperparameters** set in UI
-- This keeps the model fast and identifiable; for full hierarchical estimation see PyMC-Marketing
-- Features are standardized before regression; coefficients are on standardized scale
+> **Note:** Adstock/saturation parameters (λ, α, midpoint) are **fixed hyperparameters** set in UI. This keeps the model fast and identifiable; for full hierarchical estimation see [PyMC-Marketing](https://github.com/pymc-labs/pymc-marketing).
 
-## Performance Notes
+---
+
+## Performance Notes Performance Notes
 
 | Mode | Draws | Chains | Time (4 channels, 104 weeks) |
 |------|-------|--------|------------------------------|
@@ -214,9 +244,11 @@ Hill(x; α, m) = x^α / (x^α + m^α)
 - Use `cores=1` for reproducibility; increase for speed if needed
 - For production use: increase draws, check R-hat < 1.01, ESS > 400
 
+---
+
 ## Caveats & Limitations
 
-⚠️ **This is an analytical prototype, not causal proof.**
+**This is an analytical prototype, not causal proof.**
 
 - **Correlation ≠ Causation**: MMM identifies associations; validate with experiments (geo tests, holdouts)
 - **Data quality is critical**: Spend definitions, aggregation level, missing data all affect results
@@ -230,6 +262,8 @@ Hill(x; α, m) = x^α / (x^α + m^α)
 2. Calibration experiments (geo lift tests)
 3. Expert review of coefficient signs/magnitudes
 4. Sensitivity analysis (priors, hyperparameters, data windows)
+
+---
 
 ## Extending the Workbench
 
@@ -258,6 +292,8 @@ In `prepare_features()`:
 X["search_x_social"] = X["search"] * X["social"]
 ```
 
+---
+
 ## Testing & CI
 
 ```bash
@@ -268,7 +304,9 @@ pytest tests/
 ruff check .
 ```
 
-GitHub Actions workflow runs pytest + ruff on every push.
+GitHub Actions workflow runs `pytest` + `ruff` on every push.
+
+---
 
 ## References & Prior Art
 
@@ -280,11 +318,16 @@ GitHub Actions workflow runs pytest + ruff on every push.
 - **Streamlit** — Rapid data app framework
 - **Plotly** — Interactive visualizations
 
+---
+
 ## License
 
 MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-**Built for analysts and stakeholders who want to understand, not just use, their marketing mix model.**
-# Rebuild Tue Aug  4 05:33:13 PM CEST 2026
+## Acknowledgments
+
+Built for analysts and stakeholders who want to **understand**, not just use, their marketing mix model.
+
+**Stack:** PyMC * Streamlit * Plotly * ArviZ * NumPy * Pandas * SciPy

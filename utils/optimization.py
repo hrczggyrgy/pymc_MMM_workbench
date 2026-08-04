@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from scipy.optimize import minimize, Bounds, NonlinearConstraint
+from scipy.optimize import minimize, Bounds
 from numpy.typing import NDArray
 
 from utils.transformations import steady_state_adstock, hill_saturation
@@ -45,11 +45,48 @@ def expected_response(
     """
     adstocked = steady_state_adstock(spend, decay)
     saturated = hill_saturation(adstocked, strength, midpoint)
-    # beta_draws are on standardized features, so multiply by standardized feature
-    # For optimization we approximate: response = beta * (saturated / feature_std) * y_std
-    # Since we don't have feature_std here, we use the raw scaled response
-    # This is an approximation - the model page computes exact contributions
     return beta_draws * saturated * y_std
+
+
+def _compute_objective(
+    x: NDArray[np.floating],
+    channels: list[str],
+    result: dict,
+    n_draws: int,
+    risk_aversion: float = 0.0,
+) -> float:
+    """
+    Compute negative objective value for optimization.
+
+    Parameters
+    ----------
+    x : array
+        Spend allocation per channel.
+    channels : list
+        Channel names.
+    result : dict
+        Model result dictionary.
+    n_draws : int
+        Number of posterior draws to use.
+    risk_aversion : float
+        Risk aversion parameter (0 = risk-neutral, >0 = risk-averse).
+        Objective = -(mean - risk_aversion * variance).
+    """
+    total_mean = 0.0
+    total_var = 0.0
+    
+    for i, c in enumerate(channels):
+        p = result["params"][c]
+        beta = result["beta_draws"][:n_draws, result["features"].index(c)]
+        resp = expected_response(
+            x[i], beta, p["decay"], p["strength"], p["midpoint"], result["y_std"]
+        )
+        total_mean += resp.mean()
+        total_var += resp.var()
+    
+    if risk_aversion > 0:
+        return -(total_mean - risk_aversion * total_var)
+    return -total_mean
 
 
 def optimize_budget(
@@ -59,6 +96,7 @@ def optimize_budget(
     result: dict,
     n_draws: int = 300,
     method: str = "SLSQP",
+    risk_aversion: float = 0.0,
 ) -> tuple[dict[str, float], NDArray[np.floating]]:
     """
     Optimize budget allocation across channels to maximize expected response.
@@ -77,6 +115,9 @@ def optimize_budget(
         Number of posterior draws to use for expectation.
     method : str
         Optimization method (SLSQP, trust-constr).
+    risk_aversion : float
+        Risk aversion parameter (0 = risk-neutral, >0 = risk-averse).
+        Maximizes: mean_response - risk_aversion * variance_response.
 
     Returns
     -------
@@ -103,18 +144,6 @@ def optimize_budget(
     # Current allocation for comparison
     current = np.array([result["current_spend"][c] for c in channels])
 
-    def objective(x: NDArray[np.floating]) -> float:
-        """Negative expected total response (minimize = maximize response)."""
-        total = 0.0
-        for i, c in enumerate(channels):
-            p = result["params"][c]
-            beta = result["beta_draws"][:n_draws, result["features"].index(c)]
-            resp = expected_response(
-                x[i], beta, p["decay"], p["strength"], p["midpoint"], result["y_std"]
-            )
-            total += resp.mean()
-        return -total
-
     # Initial guess: proportional to current spend, clipped to bounds
     x0 = np.clip(current, lower, upper)
     # Adjust to meet budget constraint
@@ -139,6 +168,9 @@ def optimize_budget(
     ]
     bounds = Bounds(lower, upper)
 
+    def objective(x: NDArray[np.floating]) -> float:
+        return _compute_objective(x, channels, result, n_draws, risk_aversion)
+
     solution = minimize(
         objective,
         x0,
@@ -152,7 +184,7 @@ def optimize_budget(
         # Try with a different method as fallback
         if method != "trust-constr":
             return optimize_budget(
-                total_budget, minimums, maximums, result, n_draws, "trust-constr"
+                total_budget, minimums, maximums, result, n_draws, "trust-constr", risk_aversion
             )
         raise ValueError(f"Optimization failed: {solution.message}")
 

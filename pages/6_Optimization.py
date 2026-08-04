@@ -20,11 +20,20 @@ with st.expander("📖 How optimization works", expanded=False):
     **Objective:** Maximize total expected incremental outcome
     $$\\max_{x} \\sum_c \\mathbb{E}[f_c(x_c)] \\quad \\text{s.t.} \\quad \\sum_c x_c = B, \\quad L_c \\le x_c \\le U_c$$
 
+    **With risk aversion (λ > 0):**
+    $$\\max_{x} \\left(\\sum_c \\mathbb{E}[f_c(x_c)] - \\lambda \\cdot \\text{Var}[\\sum_c f_c(x_c)]\\right)$$
+
     **Where:**
     - $x_c$ = average-period spend for channel $c$
     - $f_c$ = channel response curve (adstock + saturation, with posterior uncertainty)
     - $B$ = total budget constraint
     - $L_c, U_c$ = minimum/maximum spend per channel
+    - $\\lambda$ = risk aversion parameter (0 = risk-neutral)
+    
+    **Risk aversion interpretation:**
+    - **λ = 0**: Risk-neutral, maximizes expected outcome
+    - **λ > 0**: Penalizes variance of total outcome, prefers more certain allocations
+    - Higher λ = more conservative allocation, shifts spend to channels with lower uncertainty
     
     **Method:**
     - Uses posterior mean response curves for optimization (fast)
@@ -108,12 +117,23 @@ elif max_sum < total_budget:
 else:
     st.success(f"✅ Constraints feasible: budget ${total_budget:,.0f} ∈ [${min_sum:,.0f}, ${max_sum:,.0f}]")
 
+# Risk aversion parameter
+st.markdown("**Risk preference:**")
+risk_aversion = st.slider(
+    "Risk aversion (λ)",
+    0.0, 1.0, 0.0, 0.05,
+    key="opt_risk_aversion",
+    help="0 = risk-neutral (maximize expected outcome). "
+         "Higher values = more risk-averse (penalize variance of outcome). "
+         "λ = 0.1 means willing to give up 0.1 units of expected outcome per unit of variance reduction."
+)
+
 # Optimization button
 if st.button("Find Recommended Allocation", type="primary", use_container_width=True, disabled=(min_sum > total_budget or max_sum < total_budget)):
     with st.spinner("Optimizing budget allocation..."):
         try:
             allocation, lift_samples = optimize_budget(
-                total_budget, minimums, maximums, result, n_draws=300
+                total_budget, minimums, maximums, result, n_draws=300, risk_aversion=risk_aversion
             )
             st.session_state.optimization = {
                 "allocation": allocation,
@@ -121,6 +141,7 @@ if st.button("Find Recommended Allocation", type="primary", use_container_width=
                 "total_budget": total_budget,
                 "minimums": minimums,
                 "maximums": maximums,
+                "risk_aversion": risk_aversion,
             }
             st.success("Optimization complete!")
         except Exception as exc:

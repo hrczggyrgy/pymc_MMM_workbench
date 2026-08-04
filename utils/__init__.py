@@ -1,4 +1,7 @@
-"""Utilities package for PyMC MMM Workbench."""
+"""Utilities package for PyMC MMM Workbench.
+
+Lazy imports for heavy modules (pymc, arviz) to avoid import-time issues.
+"""
 
 from utils.data import (
     ensure_demo_data,
@@ -15,18 +18,26 @@ from utils.transformations import (
     steady_state_adstock,
 )
 from utils.simulation import generate_demo_data, generate_channel_response_curve
-from utils.modeling import (
-    fit_bayesian_mmm,
-    response_samples,
-    scenario_lift,
-    prepare_features,
-)
-from utils.optimization import (
-    optimize_budget,
-    compute_channel_roi,
-    response_curve_data,
-)
 from utils.plotting import line_with_band, allocation_chart
+
+# Lazy imports for modeling and optimization (require pymc/arviz)
+def _lazy_import_modeling():
+    from utils.modeling import (
+        fit_bayesian_mmm,
+        response_samples,
+        scenario_lift,
+        prepare_features,
+    )
+    return fit_bayesian_mmm, response_samples, scenario_lift, prepare_features
+
+def _lazy_import_optimization():
+    from utils.optimization import (
+        optimize_budget,
+        compute_channel_roi,
+        response_curve_data,
+    )
+    return optimize_budget, compute_channel_roi, response_curve_data
+
 
 __all__ = [
     "ensure_demo_data",
@@ -41,13 +52,8 @@ __all__ = [
     "steady_state_adstock",
     "generate_demo_data",
     "generate_channel_response_curve",
-    "fit_bayesian_mmm",
-    "response_samples",
-    "scenario_lift",
-    "prepare_features",
-    "optimize_budget",
-    "compute_channel_roi",
-    "response_curve_data",
     "line_with_band",
     "allocation_chart",
+    "_lazy_import_modeling",
+    "_lazy_import_optimization",
 ]

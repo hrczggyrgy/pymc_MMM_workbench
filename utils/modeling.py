@@ -344,6 +344,9 @@ def scenario_lift(plan: dict[str, float], result: dict) -> NDArray[np.floating]:
     scenario = np.zeros(n_draws)
 
     for c in result["channels"]:
+        # Skip channels not in plan (defensive)
+        if c not in plan:
+            continue
         baseline += response_samples(result["current_spend"][c], c, result, n_draws)
         scenario += response_samples(plan[c], c, result, n_draws)
 

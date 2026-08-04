@@ -5,10 +5,13 @@ from plotly.subplots import make_subplots
 import streamlit as st
 
 from utils.data import ensure_demo_data
-from utils.modeling import scenario_lift
+from utils import _lazy_import_modeling
 
-st.set_page_config(page_title="Scenarios | MMM Workbench", page_icon="🎯", layout="wide")
+st.set_page_config(page_title="Scenarios | MMM Workbench", layout="wide")
 ensure_demo_data()
+
+# Lazy imports
+_, _, scenario_lift, _ = _lazy_import_modeling()
 
 result = st.session_state.get("model_result")
 

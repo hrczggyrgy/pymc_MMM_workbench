@@ -14,10 +14,13 @@ from utils.transformations import (
     effective_spend_range,
 )
 from utils.simulation import generate_channel_response_curve
-from utils.plotting import get_channel_color
+from utils import _lazy_import_plotting
 
 st.set_page_config(page_title="Effect Explorer | MMM Workbench", layout="wide")
 ensure_demo_data()
+
+# Lazy import plotting functions
+get_channel_color, *_ = _lazy_import_plotting()
 
 df = configured_data()
 channels = st.session_state.channel_cols
@@ -256,7 +259,8 @@ if "model_result" in st.session_state and st.session_state.model_result:
     result = st.session_state.model_result
     if channel in result["channels"]:
         st.subheader("4. Modeled Response Curve (from fitted model)")
-        from utils.optimization import response_curve_data
+        from utils import _lazy_import_optimization
+        response_curve_data = _lazy_import_optimization()[2]
         spend_vals, mean_resp, low_resp, high_resp = response_curve_data(channel, result)
 
         fig5 = go.Figure()

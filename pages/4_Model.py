@@ -6,11 +6,14 @@ import streamlit as st
 import arviz as az
 
 from utils.data import ensure_demo_data, configured_data, validate_data
-from utils.modeling import fit_bayesian_mmm, fit_bayesian_mmm_cached
-from utils.plotting import line_with_band
+from utils import _lazy_import_modeling, _lazy_import_plotting
 
-st.set_page_config(page_title="Model | MMM Workbench", page_icon="🧠", layout="wide")
+st.set_page_config(page_title="Model | MMM Workbench", layout="wide")
 ensure_demo_data()
+
+# Lazy imports
+fit_bayesian_mmm, fit_bayesian_mmm_cached, *_ = _lazy_import_modeling()
+line_with_band, *_ = _lazy_import_plotting()
 
 df = configured_data()
 channels = st.session_state.channel_cols

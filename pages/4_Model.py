@@ -6,7 +6,7 @@ import streamlit as st
 import arviz as az
 
 from utils.data import ensure_demo_data, configured_data, validate_data
-from utils.modeling import fit_bayesian_mmm
+from utils.modeling import fit_bayesian_mmm, fit_bayesian_mmm_cached
 from utils.plotting import line_with_band
 
 st.set_page_config(page_title="Model | MMM Workbench", page_icon="🧠", layout="wide")
@@ -28,8 +28,8 @@ with st.expander("📖 How the model works", expanded=False):
     ```
     
     **Transformations (fixed, not estimated):**
-    - **Adstock**: `f_c(spend) = Σ_{k=0}^{L} λ^k × spend_{t-k}` (geometric carryover)
-    - **Saturation**: `Hill(x) = x^α / (x^α + midpoint^α)` (diminishing returns)
+    - **Adstock**: `f_c(spend) = Σ_{k=0}^{L} λ_c^k × spend_{t-k}` (geometric carryover, per-channel λ)
+    - **Saturation**: `Hill(x) = x^α_c / (x^α_c + midpoint_c^α_c)` (diminishing returns, per-channel α)
     
     **Priors:**
     - α (intercept) ~ Normal(0, 1.5) on standardized scale
@@ -54,23 +54,71 @@ if len(channels) < 2:
 # Model configuration
 st.subheader("Model Configuration")
 
-c1, c2, c3, c4 = st.columns(4)
-decay = c1.slider("Shared adstock decay (λ)", 0.0, 0.95, 0.5, 0.01, key="model_decay",
-                  help="Carryover rate shared across all channels")
-strength = c2.slider("Shared saturation strength (α)", 0.3, 3.0, 1.5, 0.05, key="model_strength",
-                     help="Hill function steepness shared across channels")
-prior_scale = c3.select_slider("Prior strength for β", options=[0.5, 1.0, 1.5, 2.0], value=1.0, key="model_prior",
-                               help="Lower = stronger regularization (shrinkage toward zero)")
-seasonality = c4.toggle("Annual seasonality (sin/cos)", value=True, key="model_seasonality")
+# Per-channel parameters with shared defaults
+st.markdown("**Per-channel adstock decay (λ) & saturation strength (α):**")
+st.caption("Each channel can have its own carryover and saturation profile. Search/TV typically have slower decay; Social/Display saturate faster.")
 
-l_max = st.slider("Carryover window (L)", 1, 20, 8, key="model_lmax",
-                  help="Maximum lag periods for adstock sum")
+# Initialize session state for per-channel params
+if "per_channel_decay" not in st.session_state:
+    st.session_state.per_channel_decay = {c: 0.5 for c in channels}
+if "per_channel_strength" not in st.session_state:
+    st.session_state.per_channel_strength = {c: 1.5 for c in channels}
 
+# Shared defaults for quick setup
 c1, c2 = st.columns(2)
-quick = c1.toggle("Fast demo fit (250 draws)", value=True, key="model_quick",
+shared_decay = c1.slider("Default adstock decay (λ)", 0.0, 0.95, 0.5, 0.01, key="model_shared_decay",
+                         help="Applied to all channels when you click 'Apply to all'")
+shared_strength = c2.slider("Default saturation strength (α)", 0.3, 3.0, 1.5, 0.05, key="model_shared_strength",
+                            help="Applied to all channels when you click 'Apply to all'")
+
+if st.button("Apply defaults to all channels", key="apply_defaults"):
+    for c in channels:
+        st.session_state.per_channel_decay[c] = shared_decay
+        st.session_state.per_channel_strength[c] = shared_strength
+    st.rerun()
+
+# Per-channel sliders
+decay = {}
+strength = {}
+cols = st.columns(min(4, len(channels)))
+for i, channel in enumerate(channels):
+    with cols[i % len(cols)]:
+        st.markdown(f"**{channel.title()}**")
+        decay[channel] = st.slider(
+            f"Decay λ_{channel}",
+            0.0, 0.95,
+            st.session_state.per_channel_decay.get(channel, 0.5),
+            0.01,
+            key=f"decay_{channel}",
+            help=f"Carryover rate for {channel}. Higher = longer memory."
+        )
+        strength[channel] = st.slider(
+            f"Strength α_{channel}",
+            0.3, 3.0,
+            st.session_state.per_channel_strength.get(channel, 1.5),
+            0.05,
+            key=f"strength_{channel}",
+            help=f"Saturation steepness for {channel}. Higher = sharper diminishing returns."
+        )
+        st.session_state.per_channel_decay[channel] = decay[channel]
+        st.session_state.per_channel_strength[channel] = strength[channel]
+
+# Shared settings
+c1, c2, c3, c4 = st.columns(4)
+prior_scale = c1.select_slider("Prior strength for β", options=[0.5, 1.0, 1.5, 2.0], value=1.0, key="model_prior",
+                               help="Lower = stronger regularization (shrinkage toward zero)")
+seasonality = c2.toggle("Annual seasonality (sin/cos)", value=True, key="model_seasonality")
+l_max = c3.slider("Carryover window (L)", 1, 20, 8, key="model_lmax",
+                  help="Maximum lag periods for adstock sum")
+quick = c4.toggle("Fast demo fit (250 draws)", value=True, key="model_quick",
                   help="250 tune + 250 draws per chain. Uncheck for production quality (700+ draws).")
-midpoint_scale = c2.select_slider("Midpoint scale", options=[0.5, 0.75, 1.0, 1.5, 2.0], value=1.0, key="model_midpoint",
+
+midpoint_scale = st.select_slider("Midpoint scale", options=[0.5, 0.75, 1.0, 1.5, 2.0], value=1.0, key="model_midpoint",
                                    help="Scales channel midpoint relative to median spend")
+
+# Out-of-sample validation
+test_size = st.slider("Holdout fraction (out-of-sample)", 0.0, 0.3, 0.0, 0.05, key="model_test_size",
+                      help="Fraction of data to hold out for validation. 0.2 = last 20% for testing.")
 
 draws = 250 if quick else 700
 tune = 250 if quick else 700
@@ -83,10 +131,16 @@ for level, msg in issues:
 if st.button("Fit Bayesian MMM", type="primary", use_container_width=True):
     with st.spinner("Sampling posterior distributions... (this may take 30-120 seconds)"):
         try:
-            result = fit_bayesian_mmm(
+            # Convert per-channel dicts to tuples for cache key
+            channels_tuple = tuple(channels)
+            controls_tuple = tuple(controls)
+            decay_tuple = tuple(decay[c] for c in channels)
+            strength_tuple = tuple(strength[c] for c in channels)
+            
+            result = fit_bayesian_mmm_cached(
                 df, st.session_state.date_col, st.session_state.target_col,
-                channels, controls, decay, l_max, strength, midpoint_scale,
-                seasonality, prior_scale, draws, tune
+                channels_tuple, controls_tuple, decay_tuple, l_max, strength_tuple,
+                midpoint_scale, seasonality, prior_scale, draws, tune, test_size=test_size
             )
             st.session_state.model_result = result
             st.success("Model fit complete!")
@@ -111,10 +165,28 @@ col1, col2, col3, col4 = st.columns(4)
 rmse = np.sqrt(((pred.observed - pred["mean"]) ** 2).mean())
 mape = np.mean(np.abs((pred.observed - pred["mean"]) / pred.observed)) * 100
 r2 = 1 - ((pred.observed - pred["mean"]) ** 2).sum() / ((pred.observed - pred.observed.mean()) ** 2).sum()
-col1.metric("RMSE", f"{rmse:,.0f}")
-col2.metric("MAPE", f"{mape:.1f}%")
-col3.metric("R²", f"{r2:.3f}")
+col1.metric("RMSE (train)", f"{rmse:,.0f}")
+col2.metric("MAPE (train)", f"{mape:.1f}%")
+col3.metric("R² (train)", f"{r2:.3f}")
 col4.metric("Periods", f"{len(pred)}")
+
+# Out-of-sample validation results
+if "test_prediction" in result and result["test_prediction"] is not None:
+    st.markdown("---")
+    st.subheader("🔍 Out-of-Sample Validation")
+    test_pred = result["test_prediction"]
+    test_metrics = result["test_metrics"]
+    
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("RMSE (test)", f"{test_metrics['rmse']:,.0f}", delta=f"{test_metrics['rmse'] - rmse:,.0f} vs train", delta_color="inverse")
+    c2.metric("MAPE (test)", f"{test_metrics['mape']:.1f}%", delta=f"{test_metrics['mape'] - mape:.1f}% vs train", delta_color="inverse")
+    c3.metric("R² (test)", f"{test_metrics['r2']:.3f}", delta=f"{test_metrics['r2'] - r2:.3f} vs train", delta_color="normal")
+    c4.metric("Test periods", f"{test_metrics['n_test']}")
+    
+    # Test prediction chart
+    st.plotly_chart(line_with_band(test_pred, "date", "mean", "low", "high",
+                                    "Out-of-Sample: Observed vs Posterior Prediction", "observed"),
+                    use_container_width=True)
 
 # --- 2. Posterior Summary ---
 st.subheader("2. Posterior Summary")
@@ -127,27 +199,27 @@ beta_rows["channel"] = beta_rows["parameter"].str.extract(r"beta\[(.*?)\]")
 # Add channel mapping
 channel_map = {c: c for c in channels}
 for idx, row in beta_rows.iterrows():
-feat = row["channel"]
+    feat = row["channel"]
     if feat in result["features"]:
         beta_rows.at[idx, "feature"] = feat
 
-    summary_fmt = summary.copy()
-    for col in ["mean", "sd", "hdi_3%", "hdi_97%"]:
-        if col in summary_fmt.columns:
-            summary_fmt[col] = summary_fmt[col].apply(lambda x: f"{x:.3f}")
-    for col in ["mcse_mean", "mcse_sd"]:
-        if col in summary_fmt.columns:
-            summary_fmt[col] = summary_fmt[col].apply(lambda x: f"{x:.4f}")
-    for col in ["ess_bulk", "ess_tail"]:
-        if col in summary_fmt.columns:
-            summary_fmt[col] = summary_fmt[col].apply(lambda x: f"{x:.0f}")
-    if "r_hat" in summary_fmt.columns:
-        summary_fmt["r_hat"] = summary_fmt["r_hat"].apply(lambda x: f"{x:.3f}")
+summary_fmt = summary.copy()
+for col in ["mean", "sd", "hdi_3%", "hdi_97%"]:
+    if col in summary_fmt.columns:
+        summary_fmt[col] = summary_fmt[col].apply(lambda x: f"{x:.3f}")
+for col in ["mcse_mean", "mcse_sd"]:
+    if col in summary_fmt.columns:
+        summary_fmt[col] = summary_fmt[col].apply(lambda x: f"{x:.4f}")
+for col in ["ess_bulk", "ess_tail"]:
+    if col in summary_fmt.columns:
+        summary_fmt[col] = summary_fmt[col].apply(lambda x: f"{x:.0f}")
+if "r_hat" in summary_fmt.columns:
+    summary_fmt["r_hat"] = summary_fmt["r_hat"].apply(lambda x: f"{x:.3f}")
 
-    st.dataframe(
-        summary_fmt,
-        use_container_width=True, hide_index=True
-    )
+st.dataframe(
+    summary_fmt,
+    use_container_width=True, hide_index=True
+)
 
 # --- 3. Channel Coefficient Posteriors ---
 st.subheader("3. Channel Effect Posteriors (β coefficients)")

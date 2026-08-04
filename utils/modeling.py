@@ -19,9 +19,9 @@ def prepare_features(
     target_col: str,
     channels: list[str],
     controls: list[str],
-    decay: float,
+    decay: dict[str, float] | float,
     l_max: int,
-    strength: float,
+    strength: dict[str, float] | float,
     midpoint_scale: float,
     seasonality: bool,
 ) -> tuple[
@@ -35,6 +35,13 @@ def prepare_features(
 ]:
     """
     Prepare model features: transform media, add controls, trend, seasonality.
+
+    Parameters
+    ----------
+    decay : dict or float
+        Per-channel adstock decay, or single shared value
+    strength : dict or float
+        Per-channel saturation strength, or single shared value
 
     Returns
     -------
@@ -56,16 +63,22 @@ def prepare_features(
     media = {}
     params = {}
 
+    # Normalize to per-channel dicts
+    if isinstance(decay, (int, float)):
+        decay = {c: float(decay) for c in channels}
+    if isinstance(strength, (int, float)):
+        strength = {c: float(strength) for c in channels}
+
     for channel in channels:
         raw = data[channel].clip(lower=0).to_numpy(float)
         midpoint = max(
             np.median(raw[raw > 0]) * midpoint_scale if np.any(raw > 0) else 1, 1
         )
-        media[channel] = transform_media(raw, decay, l_max, strength, midpoint)
+        media[channel] = transform_media(raw, decay[channel], l_max, strength[channel], midpoint)
         params[channel] = {
-            "decay": decay,
+            "decay": decay[channel],
             "l_max": l_max,
-            "strength": strength,
+            "strength": strength[channel],
             "midpoint": midpoint,
         }
 
@@ -97,15 +110,16 @@ def fit_bayesian_mmm(
     target_col: str,
     channels: list[str],
     controls: list[str],
-    decay: float = 0.5,
+    decay: dict[str, float] | float = 0.5,
     l_max: int = 8,
-    strength: float = 1.5,
+    strength: dict[str, float] | float = 1.5,
     midpoint_scale: float = 1.0,
     seasonality: bool = True,
     prior_scale: float = 1.0,
     draws: int = 500,
     tune: int = 500,
     seed: int = 42,
+    test_size: float = 0.0,
 ) -> dict:
     """
     Fit a Bayesian MMM using PyMC.
@@ -116,11 +130,21 @@ def fit_bayesian_mmm(
         beta ~ Normal(0, prior_scale)
         sigma ~ HalfNormal(1)
 
+    Parameters
+    ----------
+    decay : dict or float
+        Per-channel adstock decay, or single shared value
+    strength : dict or float
+        Per-channel saturation strength, or single shared value
+    test_size : float
+        Fraction of data to hold out for out-of-sample validation (0.0 to 0.5)
+
     Returns
     -------
     dict with keys:
         idata, prediction, summary, contrib, features, beta_draws,
         means, stds, y_mean, y_std, params, channels, current_spend
+        If test_size > 0: also includes test_prediction, test_metrics
     """
     data, X, X_scaled, y, means, stds, params = prepare_features(
         df, date_col, target_col, channels, controls, decay, l_max, strength, midpoint_scale, seasonality
@@ -129,17 +153,44 @@ def fit_bayesian_mmm(
     y_mean, y_std = y.mean(), max(y.std(), 1.0)
     y_scaled = (y - y_mean) / y_std
 
-    coords = {"feature": X.columns.tolist(), "obs": np.arange(len(data))}
+    # Train/test split
+    n_obs = len(data)
+    test_n = int(n_obs * test_size)
+    train_n = n_obs - test_n
+    
+    if test_n > 0:
+        # Split data chronologically
+        train_idx = slice(0, train_n)
+        test_idx = slice(train_n, n_obs)
+        
+        X_train = X_scaled.iloc[train_idx]
+        y_train = y_scaled[train_idx]
+        X_test = X_scaled.iloc[test_idx]
+        y_test = y_scaled[test_idx]
+        dates_train = data[date_col].iloc[train_idx].values
+        dates_test = data[date_col].iloc[test_idx].values
+        y_test_orig = y[test_idx]
+    else:
+        X_train = X_scaled
+        y_train = y_scaled
+        X_test = None
+        y_test = None
+        dates_train = data[date_col].values
+        dates_test = None
+        y_test_orig = None
+        train_n = n_obs
+
+    coords = {"feature": X.columns.tolist(), "obs": np.arange(train_n)}
 
     with pm.Model(coords=coords):
-        x_data = pm.Data("x", X_scaled.to_numpy(), dims=("obs", "feature"))
+        x_data = pm.Data("x", X_train.to_numpy(), dims=("obs", "feature"))
 
         alpha = pm.Normal("alpha", 0, 1.5)
         beta = pm.Normal("beta", 0, prior_scale, dims="feature")
         sigma = pm.HalfNormal("sigma", 1)
 
         mu = pm.Deterministic("mu", alpha + pm.math.dot(x_data, beta), dims="obs")
-        pm.Normal("likelihood", mu=mu, sigma=sigma, observed=y_scaled, dims="obs")
+        pm.Normal("likelihood", mu=mu, sigma=sigma, observed=y_train, dims="obs")
 
         idata = pm.sample(
             draws=draws,
@@ -152,24 +203,71 @@ def fit_bayesian_mmm(
             return_inferencedata=True,
         )
 
-    # Posterior predictions
+    # Posterior predictions on training data
     posterior_mu = idata.posterior["mu"].stack(sample=("chain", "draw")).values
     pred_samples = posterior_mu * y_std + y_mean
 
     prediction = pd.DataFrame(
         {
-            "date": data[date_col],
-            "observed": y,
+            "date": dates_train,
+            "observed": y[:train_n] if test_n > 0 else y,
             "mean": pred_samples.mean(axis=1),
             "low": np.quantile(pred_samples, 0.05, axis=1),
             "high": np.quantile(pred_samples, 0.95, axis=1),
         }
     )
 
+    # Out-of-sample predictions if test set provided
+    test_prediction = None
+    test_metrics = None
+    if test_n > 0:
+        # Use posterior predictive for test data - create new model with test coords
+        test_coords = {"feature": X.columns.tolist(), "obs": np.arange(test_n)}
+        with pm.Model(coords=test_coords) as test_model:
+            x_test_data = pm.Data("x_test", X_test.to_numpy(), dims=("obs", "feature"))
+            
+            alpha = pm.Normal("alpha", 0, 1.5)
+            beta = pm.Normal("beta", 0, prior_scale, dims="feature")
+            sigma = pm.HalfNormal("sigma", 1)
+
+            mu_test = pm.Deterministic("mu_test", alpha + pm.math.dot(x_test_data, beta), dims="obs")
+            # Use posterior samples for prediction
+            pm.Normal("likelihood_test", mu=mu_test, sigma=sigma, observed=y_test, dims="obs")
+
+            # Sample from posterior predictive
+            post_pred = pm.sample_posterior_predictive(
+                idata, var_names=["mu_test"], random_seed=seed, progressbar=False
+            )
+        
+        test_mu = post_pred.posterior_predictive["mu_test"].stack(sample=("chain", "draw")).values
+        test_pred_samples = test_mu * y_std + y_mean
+
+        test_prediction = pd.DataFrame(
+            {
+                "date": dates_test,
+                "observed": y_test_orig,
+                "mean": test_pred_samples.mean(axis=1),
+                "low": np.quantile(test_pred_samples, 0.05, axis=1),
+                "high": np.quantile(test_pred_samples, 0.95, axis=1),
+            }
+        )
+
+        # Calculate test metrics
+        test_rmse = np.sqrt(((test_prediction.observed - test_prediction["mean"]) ** 2).mean())
+        test_mape = np.mean(np.abs((test_prediction.observed - test_prediction["mean"]) / test_prediction.observed)) * 100
+        test_r2 = 1 - ((test_prediction.observed - test_prediction["mean"]) ** 2).sum() / ((test_prediction.observed - test_prediction.observed.mean()) ** 2).sum()
+        
+        test_metrics = {
+            "rmse": test_rmse,
+            "mape": test_mape,
+            "r2": test_r2,
+            "n_test": test_n,
+        }
+
     # Posterior summary
     beta_draws = idata.posterior["beta"].stack(sample=("chain", "draw")).transpose("sample", "feature").values
     feature_names = X.columns.tolist()
-    summary = az.summary(idata, var_names=["alpha", "beta", "sigma"], hdi_prob=0.9).reset_index().rename(columns={"index": "parameter"})
+    summary = az.summary(idata, var_names=["alpha", "beta", "sigma"], ci_prob=0.9).reset_index().rename(columns={"index": "parameter"})
 
     # Channel contributions (on original scale)
     contrib = pd.DataFrame(
@@ -179,7 +277,7 @@ def fit_bayesian_mmm(
         }
     )
 
-    return {
+    result = {
         "idata": idata,
         "prediction": prediction,
         "summary": summary,
@@ -194,6 +292,14 @@ def fit_bayesian_mmm(
         "channels": channels,
         "current_spend": {c: float(data[c].mean()) for c in channels},
     }
+    
+    if test_n > 0:
+        result["test_prediction"] = test_prediction
+        result["test_metrics"] = test_metrics
+        result["train_n"] = train_n
+        result["test_n"] = test_n
+
+    return result
 
 
 def response_samples(
@@ -241,7 +347,44 @@ __all__ = [
     "transform_media",
     "prepare_features",
     "fit_bayesian_mmm",
+    "fit_bayesian_mmm_cached",
     "response_samples",
     "scenario_lift",
     "optimize_budget",
 ]
+
+
+@st.cache_resource(show_spinner=False)
+def fit_bayesian_mmm_cached(
+    df: pd.DataFrame,
+    date_col: str,
+    target_col: str,
+    channels: tuple[str, ...],
+    controls: tuple[str, ...],
+    decay: tuple[float, ...],
+    l_max: int,
+    strength: tuple[float, ...],
+    midpoint_scale: float,
+    seasonality: bool,
+    prior_scale: float,
+    draws: int,
+    tune: int,
+    seed: int = 42,
+    test_size: float = 0.0,
+) -> dict:
+    """
+    Cached version of fit_bayesian_mmm that takes hashable arguments.
+    
+    Converts dict/list params to tuples for cache key hashing.
+    """
+    # Convert tuples back to dicts for the actual fitting function
+    channels_list = list(channels)
+    controls_list = list(controls)
+    decay_dict = {c: d for c, d in zip(channels_list, decay)}
+    strength_dict = {c: s for c, s in zip(channels_list, strength)}
+    
+    return fit_bayesian_mmm(
+        df, date_col, target_col, channels_list, controls_list,
+        decay_dict, l_max, strength_dict, midpoint_scale,
+        seasonality, prior_scale, draws, tune, seed, test_size
+    )

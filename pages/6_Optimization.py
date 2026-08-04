@@ -5,7 +5,7 @@ from plotly.subplots import make_subplots
 import streamlit as st
 
 from utils.data import ensure_demo_data
-from utils.modeling import optimize_budget, compute_channel_roi, response_curve_data
+from utils.optimization import optimize_budget, compute_channel_roi, response_curve_data
 
 st.set_page_config(page_title="Optimization | MMM Workbench", page_icon="⚙️", layout="wide")
 ensure_demo_data()

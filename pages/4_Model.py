@@ -22,7 +22,7 @@ controls = st.session_state.control_cols
 st.title("Bayesian MMM")
 st.caption("Fit a Bayesian regression with adstock and saturation transformations. All parameters have posterior uncertainty.")
 
-with st.expander("📖 How the model works", expanded=False):
+with st.expander(":material/info: How the model works", expanded=False):
     st.markdown("""
     **Model Specification:**
     ```
@@ -68,7 +68,7 @@ if "per_channel_strength" not in st.session_state:
     st.session_state.per_channel_strength = {c: 1.5 for c in channels}
 
 # Shared defaults for quick setup
-c1, c2 = st.columns(2)
+c1, c2 = st.columns(2, gap="medium")
 shared_decay = c1.slider("Default adstock decay (λ)", 0.0, 0.95, 0.5, 0.01, key="model_shared_decay",
                          help="Applied to all channels when you click 'Apply to all'")
 shared_strength = c2.slider("Default saturation strength (α)", 0.3, 3.0, 1.5, 0.05, key="model_shared_strength",
@@ -83,7 +83,7 @@ if st.button("Apply defaults to all channels", key="apply_defaults"):
 # Per-channel sliders
 decay = {}
 strength = {}
-cols = st.columns(min(4, len(channels)))
+cols = st.columns(min(4, len(channels)), gap="medium")
 for i, channel in enumerate(channels):
     with cols[i % len(cols)]:
         st.markdown(f"**{channel.title()}**")
@@ -107,7 +107,7 @@ for i, channel in enumerate(channels):
         st.session_state.per_channel_strength[channel] = strength[channel]
 
 # Shared settings
-c1, c2, c3, c4 = st.columns(4)
+c1, c2, c3, c4 = st.columns(4, gap="medium")
 prior_scale = c1.select_slider("Prior strength for β", options=[0.5, 1.0, 1.5, 2.0], value=1.0, key="model_prior",
                                help="Lower = stronger regularization (shrinkage toward zero)")
 seasonality = c2.toggle("Annual seasonality (sin/cos)", value=True, key="model_seasonality")
@@ -164,7 +164,7 @@ st.plotly_chart(line_with_band(pred, "date", "mean", "low", "high",
                 use_container_width=True)
 
 # Fit metrics
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4 = st.columns(4, gap="medium")
 rmse = np.sqrt(((pred.observed - pred["mean"]) ** 2).mean())
 mape = np.mean(np.abs((pred.observed - pred["mean"]) / pred.observed)) * 100
 r2 = 1 - ((pred.observed - pred["mean"]) ** 2).sum() / ((pred.observed - pred.observed.mean()) ** 2).sum()
@@ -175,12 +175,12 @@ col4.metric("Periods", f"{len(pred)}")
 
 # Out-of-sample validation results
 if "test_prediction" in result and result["test_prediction"] is not None:
-    st.markdown("---")
-    st.subheader("🔍 Out-of-Sample Validation")
+    st.divider()
+    st.subheader("Out-of-Sample Validation")
     test_pred = result["test_prediction"]
     test_metrics = result["test_metrics"]
     
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4 = st.columns(4, gap="medium")
     c1.metric("RMSE (test)", f"{test_metrics['rmse']:,.0f}", delta=f"{test_metrics['rmse'] - rmse:,.0f} vs train", delta_color="inverse")
     c2.metric("MAPE (test)", f"{test_metrics['mape']:.1f}%", delta=f"{test_metrics['mape'] - mape:.1f}% vs train", delta_color="inverse")
     c3.metric("R² (test)", f"{test_metrics['r2']:.3f}", delta=f"{test_metrics['r2'] - r2:.3f} vs train", delta_color="normal")
@@ -192,6 +192,7 @@ if "test_prediction" in result and result["test_prediction"] is not None:
                     use_container_width=True)
 
 # --- 2. Posterior Summary ---
+st.divider()
 st.subheader("2. Posterior Summary")
 summary = result["summary"]
 
@@ -225,6 +226,7 @@ st.dataframe(
 )
 
 # --- 3. Channel Coefficient Posteriors ---
+st.divider()
 st.subheader("3. Channel Effect Posteriors (β coefficients)")
 beta_draws = result["beta_draws"]
 feature_names = result["features"]
@@ -289,6 +291,7 @@ coeff_df = pd.DataFrame(coeff_data)
 st.dataframe(coeff_df, use_container_width=True, hide_index=True)
 
 # --- 4. Channel Contribution Breakdown ---
+st.divider()
 st.subheader("4. Channel Contribution to Sales (Posterior Mean)")
 contrib = result["contrib"]
 total_contrib = contrib.sum().sort_values(ascending=False)
@@ -330,6 +333,7 @@ fig_contrib_ts.update_layout(
 st.plotly_chart(fig_contrib_ts, use_container_width=True)
 
 # --- 5. Model Diagnostics ---
+st.divider()
 st.subheader("5. Sampling Diagnostics")
 idata = result["idata"]
 
@@ -339,13 +343,13 @@ max_rhat = diag_summary["r_hat"].max()
 min_ess_bulk = diag_summary["ess_bulk"].min()
 min_ess_tail = diag_summary["ess_tail"].min()
 
-c1, c2, c3 = st.columns(3)
-c1.metric("Max R-hat", f"{max_rhat:.3f}", delta="OK" if max_rhat < 1.01 else "⚠️ High", delta_color="normal" if max_rhat < 1.01 else "inverse")
-c2.metric("Min ESS (bulk)", f"{min_ess_bulk:.0f}", delta="OK" if min_ess_bulk > 100 else "⚠️ Low", delta_color="normal" if min_ess_bulk > 100 else "inverse")
-c3.metric("Min ESS (tail)", f"{min_ess_tail:.0f}", delta="OK" if min_ess_tail > 100 else "⚠️ Low", delta_color="normal" if min_ess_tail > 100 else "inverse")
+c1, c2, c3 = st.columns(3, gap="medium")
+c1.metric("Max R-hat", f"{max_rhat:.3f}", delta="OK" if max_rhat < 1.01 else "High", delta_color="normal" if max_rhat < 1.01 else "inverse")
+c2.metric("Min ESS (bulk)", f"{min_ess_bulk:.0f}", delta="OK" if min_ess_bulk > 100 else "Low", delta_color="normal" if min_ess_bulk > 100 else "inverse")
+c3.metric("Min ESS (tail)", f"{min_ess_tail:.0f}", delta="OK" if min_ess_tail > 100 else "Low", delta_color="normal" if min_ess_tail > 100 else "inverse")
 
 # Trace plots for key parameters
-st.markdown("**Trace Plots (first 4 chains combined)**")
+st.markdown("**Trace Plots**")
 trace_vars = ["alpha", "sigma"] + [f"beta[{ch}]" for ch in channels if f"beta[{ch}]" in idata.posterior.data_vars]
 
 fig_trace = make_subplots(
@@ -394,10 +398,11 @@ if len(channels) <= 4:
         pass
 
 # --- 6. Residuals ---
+st.divider()
 st.subheader("6. Residual Diagnostics")
 residuals = pred.observed - pred["mean"]
 
-c1, c2 = st.columns(2)
+c1, c2 = st.columns(2, gap="medium")
 with c1:
     fig_resid = go.Figure()
     fig_resid.add_trace(go.Scatter(

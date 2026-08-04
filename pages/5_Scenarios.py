@@ -18,7 +18,7 @@ result = st.session_state.get("model_result")
 st.title("Scenario Planner")
 st.caption("Test hypothetical spend changes against the fitted baseline with full posterior uncertainty.")
 
-with st.expander("📖 How scenarios work", expanded=False):
+with st.expander(":material/info: How scenarios work", expanded=False):
     st.markdown("""
     **What this does:**
     - Takes your fitted Bayesian model (with all its uncertainty)

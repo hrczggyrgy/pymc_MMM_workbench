@@ -18,7 +18,7 @@ result = st.session_state.get("model_result")
 st.title("Budget Optimizer")
 st.caption("Find the optimal budget allocation across channels to maximize expected outcome under constraints.")
 
-with st.expander("📖 How optimization works", expanded=False):
+with st.expander(":material/info: How optimization works", expanded=False):
     st.markdown("""
     **Objective:** Maximize total expected incremental outcome
     $$\\max_{x} \\sum_c \\mathbb{E}[f_c(x_c)] \\quad \\text{s.t.} \\quad \\sum_c x_c = B, \\quad L_c \\le x_c \\le U_c$$

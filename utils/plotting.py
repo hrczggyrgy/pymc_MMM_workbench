@@ -3,10 +3,34 @@
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import streamlit as st
+import numpy as np
 
 
-@st.cache_data
+# Consistent channel colors across all pages
+CHANNEL_COLORS = {
+    "search": "#4C72B0",
+    "social": "#DD8452",
+    "video": "#55A868",
+    "display": "#C44E52",
+    "tv": "#8172B3",
+    "radio": "#937860",
+    "email": "#DA8BC3",
+    "print": "#8C8C8C",
+    "outdoor": "#CCB974",
+    "default": "#64B5CD",
+}
+
+
+def get_channel_color(channel: str) -> str:
+    """Get consistent color for a channel."""
+    return CHANNEL_COLORS.get(channel.lower(), CHANNEL_COLORS["default"])
+
+
+def get_channel_colors(channels: list[str]) -> list[str]:
+    """Get list of colors for a list of channels."""
+    return [get_channel_color(c) for c in channels]
+
+
 def line_with_band(
     df: pd.DataFrame,
     x: str,
@@ -44,7 +68,6 @@ def line_with_band(
     return fig
 
 
-@st.cache_data
 def allocation_chart(current: dict, allocation: dict) -> go.Figure:
     """Create grouped bar chart comparing current vs recommended allocation."""
     df = pd.DataFrame({
@@ -60,7 +83,6 @@ def allocation_chart(current: dict, allocation: dict) -> go.Figure:
     )
 
 
-@st.cache_data
 def response_curve_plot(
     spend_vals, mean_resp, low_resp, high_resp,
     current_spend, optimal_spend, channel_name, color
@@ -78,12 +100,12 @@ def response_curve_plot(
         name="Posterior mean", showlegend=False
     ))
     fig.add_trace(go.Scatter(
-        x=[current_spend], y=[__import__("numpy").interp(current_spend, spend_vals, mean_resp)],
+        x=[current_spend], y=[np.interp(current_spend, spend_vals, mean_resp)],
         mode="markers", marker=dict(color="#94A3B8", size=12, symbol="circle", line=dict(width=2, color="white")),
         name="Current", showlegend=True
     ))
     fig.add_trace(go.Scatter(
-        x=[optimal_spend], y=[__import__("numpy").interp(optimal_spend, spend_vals, mean_resp)],
+        x=[optimal_spend], y=[np.interp(optimal_spend, spend_vals, mean_resp)],
         mode="markers", marker=dict(color="#EF4444", size=12, symbol="diamond", line=dict(width=2, color="white")),
         name="Optimal", showlegend=True
     ))
@@ -95,12 +117,11 @@ def response_curve_plot(
     return fig
 
 
-@st.cache_data
 def posterior_density_plot(draws_dict, colors, title="Posterior Distributions"):
     """Create overlay density plots for multiple parameter posteriors."""
     fig = go.Figure()
     for i, (name, draws) in enumerate(draws_dict.items()):
-        hist, bin_edges = __import__("numpy").histogram(draws, bins=50, density=True)
+        hist, bin_edges = np.histogram(draws, bins=50, density=True)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
         c = colors[i % len(colors)]
         fig.add_trace(go.Scatter(

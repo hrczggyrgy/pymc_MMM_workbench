@@ -1,6 +1,6 @@
 """Utilities package for PyMC MMM Workbench.
 
-Lazy imports for heavy modules (pymc, arviz, streamlit caching) to avoid import-time issues.
+Lazy imports for heavy modules (pymc, arviz, streamlit) to avoid import-time issues.
 """
 
 from utils.data import (
@@ -20,7 +20,7 @@ from utils.transformations import (
 )
 from utils.simulation import generate_demo_data, generate_channel_response_curve
 
-# Lazy imports for plotting (requires streamlit runtime for caching)
+# Lazy imports for plotting (streamlit-free)
 def _lazy_import_plotting():
     from utils.plotting import (
         line_with_band,

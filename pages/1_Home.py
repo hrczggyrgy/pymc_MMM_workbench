@@ -1,6 +1,6 @@
 import streamlit as st
 from utils.data import ensure_demo_data, set_data
-from utils.modeling import generate_demo_data
+from utils.simulation import generate_demo_data
 
 st.set_page_config(page_title="Home | MMM Workbench", page_icon="🏠", layout="wide")
 ensure_demo_data()

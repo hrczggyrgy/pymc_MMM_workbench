@@ -3,7 +3,7 @@ import streamlit as st
 import plotly.express as px
 
 from utils.data import ensure_demo_data, set_data, validate_data, detect_schema
-from utils.modeling import generate_demo_data
+from utils.simulation import generate_demo_data
 
 st.set_page_config(page_title="Data | MMM Workbench", page_icon="🗂️", layout="wide")
 ensure_demo_data()

@@ -7,7 +7,7 @@ import streamlit as st
 from utils.data import ensure_demo_data
 from utils import _lazy_import_modeling
 
-st.set_page_config(page_title="Scenarios | MMM Workbench", layout="wide")
+st.set_page_config(page_title="Scenarios | MMM Workbench", page_icon=":material/target:", layout="wide")
 ensure_demo_data()
 
 # Lazy imports
@@ -82,6 +82,11 @@ for col, channel in zip(cols, channels):
     )
     plan[channel] = baseline * (1 + change / 100)
     col.caption(f"Baseline: ${baseline:,.0f} → Plan: ${plan[channel]:,.0f}")
+
+# Ensure plan has all required channels
+for c in channels:
+    if c not in plan:
+        plan[c] = current_spend[c]
 
 # Budget constraint option
 st.markdown("---")

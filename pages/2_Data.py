@@ -5,7 +5,7 @@ import plotly.express as px
 from utils.data import ensure_demo_data, set_data, detect_schema, validate_and_clean_upload
 from utils.simulation import generate_demo_data
 
-st.set_page_config(page_title="Data | MMM Workbench", layout="wide")
+st.set_page_config(page_title="Data | MMM Workbench", page_icon=":material/folder:", layout="wide")
 ensure_demo_data()
 
 st.title("Data Setup")

@@ -2,7 +2,7 @@ import streamlit as st
 from utils.data import ensure_demo_data, set_data
 from utils.simulation import generate_demo_data
 
-st.set_page_config(page_title="Home | MMM Workbench", page_icon="🏠", layout="wide")
+st.set_page_config(page_title="Home | MMM Workbench", page_icon=":material/home:", layout="wide")
 ensure_demo_data()
 
 st.title("Marketing Mix Modeling Workbench")
@@ -11,7 +11,7 @@ st.subheader("Turn marketing spend into transparent, uncertainty-aware decisions
 # Demo data button
 c1, c2 = st.columns([1, 3])
 with c1:
-    if st.button("🚀 Try Demo Data", type="primary", use_container_width=True):
+    if st.button(":material/rocket_launch: Try Demo Data", type="primary", use_container_width=True):
         set_data(generate_demo_data(), "Built-in synthetic demo")
         st.success("Demo data loaded! Navigate to **Data** to review, then **Effect Explorer**.")
 with c2:
@@ -20,13 +20,13 @@ with c2:
 st.markdown("---")
 
 # Workflow guide
-st.markdown("### 📋 Your Guided Workflow")
+st.markdown("### :material/checklist: Your Guided Workflow")
 steps = [
-    ("1. Data", "🗂️", "Upload a CSV or use demo data. Validate schema, select date/target/channels/controls."),
-    ("2. Explore", "🔬", "Learn carryover (adstock) and diminishing returns (saturation) interactively per channel."),
-    ("3. Fit", "🧠", "Estimate media effects with a real Bayesian model (PyMC). Get full posterior uncertainty."),
-    ("4. Simulate", "🎯", "Test spend plans: 'What if Search +20%?' See credible intervals, not point estimates."),
-    ("5. Optimize", "⚙️", "Allocate a fixed budget across channels to maximize expected outcome under constraints."),
+    ("1. Data", ":material/folder:", "Upload a CSV or use demo data. Validate schema, select date/target/channels/controls."),
+    ("2. Explore", ":material/science:", "Learn carryover (adstock) and diminishing returns (saturation) interactively per channel."),
+    ("3. Fit", ":material/psychology:", "Estimate media effects with a real Bayesian model (PyMC). Get full posterior uncertainty."),
+    ("4. Simulate", ":material/target:", "Test spend plans: 'What if Search +20%?' See credible intervals, not point estimates."),
+    ("5. Optimize", ":material/tune:", "Allocate a fixed budget across channels to maximize expected outcome under constraints."),
 ]
 
 cols = st.columns(5)
@@ -38,7 +38,7 @@ for col, (title, icon, desc) in zip(cols, steps):
 st.markdown("---")
 
 # What is MMM
-with st.expander("📖 What is Marketing Mix Modeling?", expanded=True):
+with st.expander(":material/book: What is Marketing Mix Modeling?", expanded=True):
     st.markdown("""
     **Marketing Mix Modeling (MMM)** estimates how marketing activities (and other factors) drive a business outcome over time.
     
@@ -62,7 +62,7 @@ with st.expander("📖 What is Marketing Mix Modeling?", expanded=True):
     """)
 
 # Glossary
-with st.expander("📚 Glossary", expanded=False):
+with st.expander(":material/menu_book: Glossary", expanded=False):
     st.markdown("""
     | Term | Definition |
     |------|------------|
@@ -80,7 +80,7 @@ with st.expander("📚 Glossary", expanded=False):
 
 # Caveats
 st.warning("""
-⚠️ **Important Caveats**
+**Important Caveats**
 - This is an **analytical prototype**, not causal proof. MMM identifies associations, not causation.
 - **Validate before deciding**: Check holdout performance, run calibration experiments (geo tests), review with domain experts.
 - **Data quality matters**: Missing values, incorrect spend definitions, aggregation level all affect results.
@@ -89,7 +89,7 @@ st.warning("""
 """)
 
 # Quick start
-st.markdown("### 🏁 Quick Start")
+st.markdown("### :material/play_arrow: Quick Start")
 st.markdown("""
 1. **Click "Try Demo Data"** above (or upload your CSV on the **Data** page)
 2. Go to **Data** → verify column mapping → **Save configuration**

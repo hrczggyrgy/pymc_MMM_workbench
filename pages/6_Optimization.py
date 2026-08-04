@@ -7,7 +7,7 @@ import streamlit as st
 from utils.data import ensure_demo_data
 from utils import _lazy_import_optimization
 
-st.set_page_config(page_title="Optimization | MMM Workbench", layout="wide")
+st.set_page_config(page_title="Optimization | MMM Workbench", page_icon=":material/tune:", layout="wide")
 ensure_demo_data()
 
 # Lazy imports

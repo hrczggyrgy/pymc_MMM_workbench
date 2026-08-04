@@ -16,11 +16,11 @@ from utils.transformations import (
 from utils.simulation import generate_channel_response_curve
 from utils import _lazy_import_plotting
 
-st.set_page_config(page_title="Effect Explorer | MMM Workbench", layout="wide")
+st.set_page_config(page_title="Effect Explorer | MMM Workbench", page_icon=":material/science:", layout="wide")
 ensure_demo_data()
 
 # Lazy import plotting functions
-get_channel_color, *_ = _lazy_import_plotting()
+_, _, get_channel_color, *_ = _lazy_import_plotting()
 
 df = configured_data()
 channels = st.session_state.channel_cols

@@ -1,8 +1,9 @@
 import streamlit as st
 from utils.data import ensure_demo_data
 
-st.set_page_config(page_title="PyMC MMM Workbench", page_icon="📈", layout="wide")
+st.set_page_config(page_title="PyMC MMM Workbench", page_icon=":material/analytics:", layout="wide")
 ensure_demo_data()
+st.logo("https://cdn.jsdelivr.net/npm/@mdi/svg@7.4.45/svg/chart-line.svg", size="large")
 st.title("PyMC MMM Workbench")
 st.subheader("A guided Bayesian marketing mix modeling lab")
 st.markdown("Use the pages in the sidebar to load data, explore carryover and diminishing returns, fit a Bayesian model, test scenarios, and optimize your budget.")

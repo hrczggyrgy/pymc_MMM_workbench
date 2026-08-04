@@ -8,7 +8,7 @@ import arviz as az
 from utils.data import ensure_demo_data, configured_data, validate_data
 from utils import _lazy_import_modeling, _lazy_import_plotting
 
-st.set_page_config(page_title="Model | MMM Workbench", layout="wide")
+st.set_page_config(page_title="Model | MMM Workbench", page_icon=":material/psychology:", layout="wide")
 ensure_demo_data()
 
 # Lazy imports

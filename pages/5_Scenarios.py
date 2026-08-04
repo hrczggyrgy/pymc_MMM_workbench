@@ -111,6 +111,12 @@ if budget_mode == "Fixed total budget (rebalance)":
             st.caption(f"{c.title()}: ${plan[c]:,.0f} (adjusted)")
 
 # Compute lift
+# Defensive: ensure all plan channels exist in result
+missing_channels = [c for c in plan if c not in result.get("channels", [])]
+if missing_channels:
+    st.warning(f"Channels in plan not found in model result: {missing_channels}. Skipping lift calculation.")
+    st.stop()
+
 lift = scenario_lift(plan, result)
 mean_lift = lift.mean()
 low_lift = np.quantile(lift, 0.05)

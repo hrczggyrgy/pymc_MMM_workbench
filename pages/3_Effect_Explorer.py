@@ -261,7 +261,7 @@ if "model_result" in st.session_state and st.session_state.model_result:
     if channel in result["channels"]:
         st.subheader("4. Modeled Response Curve (from fitted model)")
         from utils import _lazy_import_optimization
-        response_curve_data = _lazy_import_optimization()[2]
+        _, _, response_curve_data = _lazy_import_optimization()
         spend_vals, mean_resp, low_resp, high_resp = response_curve_data(channel, result)
 
         fig5 = go.Figure()

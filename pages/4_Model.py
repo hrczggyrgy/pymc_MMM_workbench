@@ -136,7 +136,7 @@ for level, msg in issues:
     getattr(st, level)(msg)
 
 if st.button("Fit Bayesian MMM", type="primary", use_container_width=True):
-    with st.spinner("Sampling posterior distributions... (this may take 30-120 seconds)"):
+    with st.status("Fitting Bayesian MMM...", expanded=True) as status:
         try:
             # Convert per-channel dicts to tuples for cache key
             channels_tuple = tuple(channels)
@@ -144,14 +144,19 @@ if st.button("Fit Bayesian MMM", type="primary", use_container_width=True):
             decay_tuple = tuple(decay[c] for c in channels)
             strength_tuple = tuple(strength[c] for c in channels)
             
+            status.write("Setting up model...")
             result = fit_bayesian_mmm_cached(
                 df, st.session_state.date_col, st.session_state.target_col,
                 channels_tuple, controls_tuple, decay_tuple, l_max, strength_tuple,
                 midpoint_scale, seasonality, prior_scale, draws, tune, test_size=test_size
             )
+            
+            status.write("Sampling posterior distributions...")
             st.session_state.model_result = result
+            status.update(label="Model fit complete!", state="complete")
             st.success("Model fit complete!")
         except Exception as exc:
+            status.update(label="Model fitting failed", state="error")
             st.error(f"Model fitting failed: {exc}")
             st.exception(exc)
 
@@ -161,14 +166,15 @@ if not result:
     st.stop()
 
 # --- 1. Observed vs Predicted ---
-st.subheader("1. Model Fit: Observed vs Posterior Prediction")
-pred = result["prediction"]
-st.plotly_chart(line_with_band(pred, "date", "mean", "low", "high",
-                                "Observed vs Posterior Prediction", "observed"),
-                use_container_width=True)
+with st.container(border=True):
+    st.subheader("1. Model Fit: Observed vs Posterior Prediction")
+    pred = result["prediction"]
+    st.plotly_chart(line_with_band(pred, "date", "mean", "low", "high",
+                                    "Observed vs Posterior Prediction", "observed"),
+                    use_container_width=True)
 
 # Fit metrics
-col1, col2, col3, col4 = st.columns(4, gap="medium")
+col1, col2, col3, col4 = st.columns(4, gap="large")
 rmse = np.sqrt(((pred.observed - pred["mean"]) ** 2).mean())
 mape = np.mean(np.abs((pred.observed - pred["mean"]) / pred.observed)) * 100
 r2 = 1 - ((pred.observed - pred["mean"]) ** 2).sum() / ((pred.observed - pred.observed.mean()) ** 2).sum()
@@ -180,25 +186,27 @@ col4.metric("Periods", f"{len(pred)}")
 # Out-of-sample validation results
 if "test_prediction" in result and result["test_prediction"] is not None:
     st.divider()
-    st.subheader("Out-of-Sample Validation")
-    test_pred = result["test_prediction"]
-    test_metrics = result["test_metrics"]
-    
-    c1, c2, c3, c4 = st.columns(4, gap="medium")
-    c1.metric("RMSE (test)", f"{test_metrics['rmse']:,.0f}", delta=f"{test_metrics['rmse'] - rmse:,.0f} vs train", delta_color="inverse")
-    c2.metric("MAPE (test)", f"{test_metrics['mape']:.1f}%", delta=f"{test_metrics['mape'] - mape:.1f}% vs train", delta_color="inverse")
-    c3.metric("R² (test)", f"{test_metrics['r2']:.3f}", delta=f"{test_metrics['r2'] - r2:.3f} vs train", delta_color="normal")
-    c4.metric("Test periods", f"{test_metrics['n_test']}")
-    
-    # Test prediction chart
-    st.plotly_chart(line_with_band(test_pred, "date", "mean", "low", "high",
-                                    "Out-of-Sample: Observed vs Posterior Prediction", "observed"),
-                    use_container_width=True)
+    with st.container(border=True):
+        st.subheader("Out-of-Sample Validation")
+        test_pred = result["test_prediction"]
+        test_metrics = result["test_metrics"]
+        
+        c1, c2, c3, c4 = st.columns(4, gap="large")
+        c1.metric("RMSE (test)", f"{test_metrics['rmse']:,.0f}", delta=f"{test_metrics['rmse'] - rmse:,.0f} vs train", delta_color="inverse")
+        c2.metric("MAPE (test)", f"{test_metrics['mape']:.1f}%", delta=f"{test_metrics['mape'] - mape:.1f}% vs train", delta_color="inverse")
+        c3.metric("R² (test)", f"{test_metrics['r2']:.3f}", delta=f"{test_metrics['r2'] - r2:.3f} vs train", delta_color="normal")
+        c4.metric("Test periods", f"{test_metrics['n_test']}")
+        
+        # Test prediction chart
+        st.plotly_chart(line_with_band(test_pred, "date", "mean", "low", "high",
+                                        "Out-of-Sample: Observed vs Posterior Prediction", "observed"),
+                        use_container_width=True)
 
 # --- 2. Posterior Summary ---
 st.divider()
-st.subheader("2. Posterior Summary")
-summary = result["summary"]
+with st.container(border=True):
+    st.subheader("2. Posterior Summary")
+    summary = result["summary"]
 
 # Filter for key parameters
 beta_rows = summary[summary["parameter"].str.startswith("beta")].copy()
@@ -231,49 +239,50 @@ st.dataframe(
 
 # --- 3. Channel Coefficient Posteriors ---
 st.divider()
-st.subheader("3. Channel Effect Posteriors (β coefficients)")
-beta_draws = result["beta_draws"]
-feature_names = result["features"]
+with st.container(border=True):
+    st.subheader("3. Channel Effect Posteriors (β coefficients)")
+    beta_draws = result["beta_draws"]
+    feature_names = result["features"]
 
-fig_beta = make_subplots(
-    rows=1, cols=len(channels),
-    subplot_titles=[c.title() for c in channels],
-    horizontal_spacing=0.05
-)
+    fig_beta = make_subplots(
+        rows=1, cols=len(channels),
+        subplot_titles=[c.title() for c in channels],
+        horizontal_spacing=0.05
+    )
 
-colors = ["#4C72B0", "#DD8452", "#55A868", "#C44E52", "#8172B3", "#937860"]
+    colors = ["#4C72B0", "#DD8452", "#55A868", "#C44E52", "#8172B3", "#937860"]
 
-for i, ch in enumerate(channels):
-    if ch in feature_names:
-        idx = feature_names.index(ch)
-        draws_ch = beta_draws[:, idx]
-        
-        # Density
-        hist, bin_edges = np.histogram(draws_ch, bins=50, density=True)
-        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-        
-        fig_beta.add_trace(go.Scatter(
-            x=bin_centers, y=hist,
-            fill="tozeroy", fillcolor=f"rgba{tuple(list(bytes.fromhex(colors[i][1:])) + [0.3])}",
-            line=dict(color=colors[i], width=2), name=ch, showlegend=False,
-            hovertemplate="β: %{x:.3f}<br>Density: %{y:.2f}<extra></extra>"
-        ), row=1, col=i+1)
-        
-        # Zero line
-        fig_beta.add_vline(x=0, line_dash="dot", line_color="gray", opacity=0.5, row=1, col=i+1)
-        
-        # Mean marker
-        mean_val = draws_ch.mean()
-        fig_beta.add_vline(x=mean_val, line_dash="dash", line_color=colors[i],
-                           annotation_text=f"{mean_val:.2f}", annotation_position="top", row=1, col=i+1)
+    for i, ch in enumerate(channels):
+        if ch in feature_names:
+            idx = feature_names.index(ch)
+            draws_ch = beta_draws[:, idx]
+            
+            # Density
+            hist, bin_edges = np.histogram(draws_ch, bins=50, density=True)
+            bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+            
+            fig_beta.add_trace(go.Scatter(
+                x=bin_centers, y=hist,
+                fill="tozeroy", fillcolor=f"rgba{tuple(list(bytes.fromhex(colors[i][1:])) + [0.3])}",
+                line=dict(color=colors[i], width=2), name=ch, showlegend=False,
+                hovertemplate="β: %{x:.3f}<br>Density: %{y:.2f}<extra></extra>"
+            ), row=1, col=i+1)
+            
+            # Zero line
+            fig_beta.add_vline(x=0, line_dash="dot", line_color="gray", opacity=0.5, row=1, col=i+1)
+            
+            # Mean marker
+            mean_val = draws_ch.mean()
+            fig_beta.add_vline(x=mean_val, line_dash="dash", line_color=colors[i],
+                               annotation_text=f"{mean_val:.2f}", annotation_position="top", row=1, col=i+1)
 
-fig_beta.update_layout(
-    template="plotly_white",
-    title="Posterior Distributions of Channel Coefficients (standardized)",
-    margin=dict(l=10, r=10, t=60, b=10),
-    height=350,
-)
-st.plotly_chart(fig_beta, use_container_width=True)
+    fig_beta.update_layout(
+        template="plotly_white",
+        title="Posterior Distributions of Channel Coefficients (standardized)",
+        margin=dict(l=10, r=10, t=60, b=10),
+        height=350,
+    )
+    st.plotly_chart(fig_beta, use_container_width=True)
 
 # Coefficient table with credible intervals
 coeff_data = []
@@ -296,143 +305,146 @@ st.dataframe(coeff_df, use_container_width=True, hide_index=True)
 
 # --- 4. Channel Contribution Breakdown ---
 st.divider()
-st.subheader("4. Channel Contribution to Sales (Posterior Mean)")
-contrib = result["contrib"]
-total_contrib = contrib.sum().sort_values(ascending=False)
+with st.container(border=True):
+    st.subheader("4. Channel Contribution to Sales (Posterior Mean)")
+    contrib = result["contrib"]
+    total_contrib = contrib.sum().sort_values(ascending=False)
 
-fig_contrib = go.Figure()
-fig_contrib.add_trace(go.Bar(
-    x=total_contrib.index, y=total_contrib.values,
-    marker_color=[colors[i % len(colors)] for i in range(len(total_contrib))],
-    text=[f"{v:,.0f}" for v in total_contrib.values],
-    textposition="outside",
-    hovertemplate="%{x}: %{y:,.0f}<extra></extra>"
-))
-fig_contrib.update_layout(
-    template="plotly_white",
-    title="Total Modeled Contribution by Channel",
-    yaxis_title="Contribution to sales (posterior mean)",
-    margin=dict(l=10, r=10, t=50, b=10),
-)
-st.plotly_chart(fig_contrib, use_container_width=True)
-
-# Contribution over time
-st.markdown("**Contribution Over Time**")
-contrib_over_time = contrib.copy()
-contrib_over_time["date"] = pred["date"]
-fig_contrib_ts = go.Figure()
-for i, ch in enumerate(channels):
-    fig_contrib_ts.add_trace(go.Scatter(
-        x=contrib_over_time["date"], y=contrib_over_time[ch],
-        name=ch.title(), line=dict(color=colors[i % len(colors)], width=2),
-        stackgroup="one", hovertemplate="%{x|%b %Y}<br>%{y:,.0f}<extra></extra>"
+    fig_contrib = go.Figure()
+    fig_contrib.add_trace(go.Bar(
+        x=total_contrib.index, y=total_contrib.values,
+        marker_color=[colors[i % len(colors)] for i in range(len(total_contrib))],
+        text=[f"{v:,.0f}" for v in total_contrib.values],
+        textposition="outside",
+        hovertemplate="%{x}: %{y:,.0f}<extra></extra>"
     ))
-fig_contrib_ts.update_layout(
-    template="plotly_white",
-    title="Stacked Channel Contributions Over Time",
-    yaxis_title="Contribution to sales",
-    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-    margin=dict(l=10, r=10, t=50, b=10),
-)
-st.plotly_chart(fig_contrib_ts, use_container_width=True)
+    fig_contrib.update_layout(
+        template="plotly_white",
+        title="Total Modeled Contribution by Channel",
+        yaxis_title="Contribution to sales (posterior mean)",
+        margin=dict(l=10, r=10, t=50, b=10),
+    )
+    st.plotly_chart(fig_contrib, use_container_width=True)
+
+    # Contribution over time
+    st.markdown("**Contribution Over Time**")
+    contrib_over_time = contrib.copy()
+    contrib_over_time["date"] = pred["date"]
+    fig_contrib_ts = go.Figure()
+    for i, ch in enumerate(channels):
+        fig_contrib_ts.add_trace(go.Scatter(
+            x=contrib_over_time["date"], y=contrib_over_time[ch],
+            name=ch.title(), line=dict(color=colors[i % len(colors)], width=2),
+            stackgroup="one", hovertemplate="%{x|%b %Y}<br>%{y:,.0f}<extra></extra>"
+        ))
+    fig_contrib_ts.update_layout(
+        template="plotly_white",
+        title="Stacked Channel Contributions Over Time",
+        yaxis_title="Contribution to sales",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        margin=dict(l=10, r=10, t=50, b=10),
+    )
+    st.plotly_chart(fig_contrib_ts, use_container_width=True)
 
 # --- 5. Model Diagnostics ---
 st.divider()
-st.subheader("5. Sampling Diagnostics")
-idata = result["idata"]
+with st.container(border=True):
+    st.subheader("5. Sampling Diagnostics")
+    idata = result["idata"]
 
-# R-hat and ESS summary
-diag_summary = az.summary(idata, var_names=["alpha", "beta", "sigma"], hdi_prob=0.9)
-max_rhat = diag_summary["r_hat"].max()
-min_ess_bulk = diag_summary["ess_bulk"].min()
-min_ess_tail = diag_summary["ess_tail"].min()
+    # R-hat and ESS summary
+    diag_summary = az.summary(idata, var_names=["alpha", "beta", "sigma"], hdi_prob=0.9)
+    max_rhat = diag_summary["r_hat"].max()
+    min_ess_bulk = diag_summary["ess_bulk"].min()
+    min_ess_tail = diag_summary["ess_tail"].min()
 
-c1, c2, c3 = st.columns(3, gap="medium")
-c1.metric("Max R-hat", f"{max_rhat:.3f}", delta="OK" if max_rhat < 1.01 else "High", delta_color="normal" if max_rhat < 1.01 else "inverse")
-c2.metric("Min ESS (bulk)", f"{min_ess_bulk:.0f}", delta="OK" if min_ess_bulk > 100 else "Low", delta_color="normal" if min_ess_bulk > 100 else "inverse")
-c3.metric("Min ESS (tail)", f"{min_ess_tail:.0f}", delta="OK" if min_ess_tail > 100 else "Low", delta_color="normal" if min_ess_tail > 100 else "inverse")
+    c1, c2, c3 = st.columns(3, gap="large")
+    c1.metric("Max R-hat", f"{max_rhat:.3f}", delta="OK" if max_rhat < 1.01 else "High", delta_color="normal" if max_rhat < 1.01 else "inverse")
+    c2.metric("Min ESS (bulk)", f"{min_ess_bulk:.0f}", delta="OK" if min_ess_bulk > 100 else "Low", delta_color="normal" if min_ess_bulk > 100 else "inverse")
+    c3.metric("Min ESS (tail)", f"{min_ess_tail:.0f}", delta="OK" if min_ess_tail > 100 else "Low", delta_color="normal" if min_ess_tail > 100 else "inverse")
 
-# Trace plots for key parameters
-st.markdown("**Trace Plots**")
-trace_vars = ["alpha", "sigma"] + [f"beta[{ch}]" for ch in channels if f"beta[{ch}]" in idata.posterior.data_vars]
+    # Trace plots for key parameters
+    st.markdown("**Trace Plots**")
+    trace_vars = ["alpha", "sigma"] + [f"beta[{ch}]" for ch in channels if f"beta[{ch}]" in idata.posterior.data_vars]
 
-fig_trace = make_subplots(
-    rows=len(trace_vars), cols=1,
-    subplot_titles=trace_vars,
-    vertical_spacing=0.03,
-    shared_xaxes=True
-)
+    fig_trace = make_subplots(
+        rows=len(trace_vars), cols=1,
+        subplot_titles=trace_vars,
+        vertical_spacing=0.03,
+        shared_xaxes=True
+    )
 
-for i, var in enumerate(trace_vars):
-    if var in idata.posterior.data_vars:
-        samples = idata.posterior[var].values.flatten()
-        # Subsample for plotting
-        step = max(1, len(samples) // 2000)
-        samples_plot = samples[::step]
-        fig_trace.add_trace(go.Scatter(
-            y=samples_plot, mode="lines", line=dict(color=colors[i % len(colors)], width=0.5),
-            showlegend=False, hovertemplate="Sample: %{y:.3f}<extra></extra>"
-        ), row=i+1, col=1)
+    for i, var in enumerate(trace_vars):
+        if var in idata.posterior.data_vars:
+            samples = idata.posterior[var].values.flatten()
+            # Subsample for plotting
+            step = max(1, len(samples) // 2000)
+            samples_plot = samples[::step]
+            fig_trace.add_trace(go.Scatter(
+                y=samples_plot, mode="lines", line=dict(color=colors[i % len(colors)], width=0.5),
+                showlegend=False, hovertemplate="Sample: %{y:.3f}<extra></extra>"
+            ), row=i+1, col=1)
 
-fig_trace.update_layout(
-    template="plotly_white",
-    height=200 * len(trace_vars),
-    margin=dict(l=10, r=10, t=50, b=10),
-    showlegend=False,
-)
-st.plotly_chart(fig_trace, use_container_width=True)
+    fig_trace.update_layout(
+        template="plotly_white",
+        height=200 * len(trace_vars),
+        margin=dict(l=10, r=10, t=50, b=10),
+        showlegend=False,
+    )
+    st.plotly_chart(fig_trace, use_container_width=True)
 
-# Pair plot for beta coefficients (if few channels)
-if len(channels) <= 4:
-    st.markdown("**Posterior Pair Plot (Channel Coefficients)**")
-    try:
-        beta_data = idata.posterior["beta"].stack(sample=("chain", "draw")).transpose("sample", "feature").values
-        beta_df = pd.DataFrame(beta_data, columns=feature_names)
-        # Only keep channel columns
-        beta_df = beta_df[[c for c in channels if c in beta_df.columns]]
-        
-        import plotly.express as px
-        fig_pair = px.scatter_matrix(
-            beta_df, dimensions=beta_df.columns,
-            opacity=0.3, title="Posterior Correlations Between Channel Effects"
-        )
-        fig_pair.update_layout(template="plotly_white", height=500)
-        st.plotly_chart(fig_pair, use_container_width=True)
-    except Exception:
-        pass
+    # Pair plot for beta coefficients (if few channels)
+    if len(channels) <= 4:
+        st.markdown("**Posterior Pair Plot (Channel Coefficients)**")
+        try:
+            beta_data = idata.posterior["beta"].stack(sample=("chain", "draw")).transpose("sample", "feature").values
+            beta_df = pd.DataFrame(beta_data, columns=feature_names)
+            # Only keep channel columns
+            beta_df = beta_df[[c for c in channels if c in beta_df.columns]]
+            
+            import plotly.express as px
+            fig_pair = px.scatter_matrix(
+                beta_df, dimensions=beta_df.columns,
+                opacity=0.3, title="Posterior Correlations Between Channel Effects"
+            )
+            fig_pair.update_layout(template="plotly_white", height=500)
+            st.plotly_chart(fig_pair, use_container_width=True)
+        except Exception:
+            pass
 
 # --- 6. Residuals ---
 st.divider()
-st.subheader("6. Residual Diagnostics")
-residuals = pred.observed - pred["mean"]
+with st.container(border=True):
+    st.subheader("6. Residual Diagnostics")
+    residuals = pred.observed - pred["mean"]
 
-c1, c2 = st.columns(2, gap="medium")
-with c1:
-    fig_resid = go.Figure()
-    fig_resid.add_trace(go.Scatter(
-        x=pred["date"], y=residuals,
-        mode="markers", marker=dict(color="#4C72B0", size=6, opacity=0.6),
-        name="Residuals"
-    ))
-    fig_resid.add_hline(y=0, line_dash="dash", line_color="gray")
-    fig_resid.update_layout(template="plotly_white", title="Residuals Over Time",
-                            yaxis_title="Observed - Predicted", margin=dict(l=10, r=10, t=50, b=10))
-    st.plotly_chart(fig_resid, use_container_width=True)
+    c1, c2 = st.columns(2, gap="large")
+    with c1:
+        fig_resid = go.Figure()
+        fig_resid.add_trace(go.Scatter(
+            x=pred["date"], y=residuals,
+            mode="markers", marker=dict(color="#4C72B0", size=6, opacity=0.6),
+            name="Residuals"
+        ))
+        fig_resid.add_hline(y=0, line_dash="dash", line_color="gray")
+        fig_resid.update_layout(template="plotly_white", title="Residuals Over Time",
+                                yaxis_title="Observed - Predicted", margin=dict(l=10, r=10, t=50, b=10))
+        st.plotly_chart(fig_resid, use_container_width=True)
 
-with c2:
-    fig_hist = go.Figure()
-    fig_hist.add_trace(go.Histogram(
-        x=residuals, nbinsx=30, marker_color="#4C72B0", opacity=0.7,
-        name="Residuals"
-    ))
-    # Normal overlay
-    from scipy import stats
-    x_norm = np.linspace(residuals.min(), residuals.max(), 100)
-    y_norm = stats.norm.pdf(x_norm, residuals.mean(), residuals.std()) * len(residuals) * (residuals.max() - residuals.min()) / 30
-    fig_hist.add_trace(go.Scatter(x=x_norm, y=y_norm, line=dict(color="#EF4444", width=2), name="Normal fit"))
-    fig_hist.update_layout(template="plotly_white", title="Residual Distribution",
-                           xaxis_title="Residual", yaxis_title="Count", margin=dict(l=10, r=10, t=50, b=10))
-    st.plotly_chart(fig_hist, use_container_width=True)
+    with c2:
+        fig_hist = go.Figure()
+        fig_hist.add_trace(go.Histogram(
+            x=residuals, nbinsx=30, marker_color="#4C72B0", opacity=0.7,
+            name="Residuals"
+        ))
+        # Normal overlay
+        from scipy import stats
+        x_norm = np.linspace(residuals.min(), residuals.max(), 100)
+        y_norm = stats.norm.pdf(x_norm, residuals.mean(), residuals.std()) * len(residuals) * (residuals.max() - residuals.min()) / 30
+        fig_hist.add_trace(go.Scatter(x=x_norm, y=y_norm, line=dict(color="#EF4444", width=2), name="Normal fit"))
+        fig_hist.update_layout(template="plotly_white", title="Residual Distribution",
+                               xaxis_title="Residual", yaxis_title="Count", margin=dict(l=10, r=10, t=50, b=10))
+        st.plotly_chart(fig_hist, use_container_width=True)
 
 # Save model for other pages
 st.caption("Model saved. Navigate to **Scenarios** or **Optimization** to use the fitted model.")

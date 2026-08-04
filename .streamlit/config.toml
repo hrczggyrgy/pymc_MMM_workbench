@@ -4,3 +4,6 @@ backgroundColor = "#FFFFFF"
 secondaryBackgroundColor = "#F1F5F9"
 textColor = "#1F2937"
 font = "sans serif"
+
+[server]
+favicon = "https://cdn.jsdelivr.net/npm/@mdi/svg@7.4.45/svg/chart-line.svg"

@@ -14,4 +14,21 @@ with left:
 with right:
     st.success("**Modeling note:** The Model page fits a real PyMC Bayesian regression over adstock and saturation transformed media features.")
 
+# Sidebar page status badges
+with st.sidebar:
+    st.markdown("---")
+    st.caption("**Page Status**")
+    
+    # Check model status
+    if "model_result" in st.session_state:
+        st.badge("Model fitted ✅", color="green")
+    else:
+        st.badge("Model not fitted", color="gray")
+    
+    if "optimization" in st.session_state:
+        st.badge("Optimization done ✅", color="green")
+    else:
+        st.badge("Optimization pending", color="gray")
+
 st.caption("Decision support, not causal proof. Validate data quality, calibration assumptions, and business constraints before using recommendations operationally.")
+st.caption("Built with PyMC · Streamlit · Plotly")

@@ -8,6 +8,7 @@ from utils.data import (
     set_data,
     detect_schema,
     validate_data,
+    validate_and_clean_upload,
     configured_data,
 )
 from utils.transformations import (
@@ -18,7 +19,13 @@ from utils.transformations import (
     steady_state_adstock,
 )
 from utils.simulation import generate_demo_data, generate_channel_response_curve
-from utils.plotting import line_with_band, allocation_chart
+from utils.plotting import (
+    line_with_band,
+    allocation_chart,
+    get_channel_color,
+    get_channel_colors,
+    CHANNEL_COLORS,
+)
 
 # Lazy imports for modeling and optimization (require pymc/arviz)
 def _lazy_import_modeling():
@@ -44,6 +51,7 @@ __all__ = [
     "set_data",
     "detect_schema",
     "validate_data",
+    "validate_and_clean_upload",
     "configured_data",
     "geometric_adstock",
     "hill_saturation",
@@ -54,6 +62,9 @@ __all__ = [
     "generate_channel_response_curve",
     "line_with_band",
     "allocation_chart",
+    "get_channel_color",
+    "get_channel_colors",
+    "CHANNEL_COLORS",
     "_lazy_import_modeling",
     "_lazy_import_optimization",
 ]

@@ -11,7 +11,7 @@ st.set_page_config(page_title="Scenarios | MMM Workbench", layout="wide")
 ensure_demo_data()
 
 # Lazy imports
-_, _, scenario_lift, _ = _lazy_import_modeling()
+_, _, scenario_lift, _, _ = _lazy_import_modeling()
 
 result = st.session_state.get("model_result")
 

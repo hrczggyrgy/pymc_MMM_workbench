@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+        cache: "pip"
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest ruff
+    
+    - name: Lint with ruff
+      run: |
+        ruff check .
+    
+    - name: Run tests
+      run: |
+        pytest tests/ -v --tb=short -x
+      env:
+        PYTHONPATH: /home/runner/work/pymc_MMM_workbench/pymc_MMM_workbench
+
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: test
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+        cache: "pip"
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Quick model fit smoke test
+      run: |
+        python -c "
+        import numpy as np
+        from utils.simulation import generate_demo_data
+        from utils.modeling import fit_bayesian_mmm
+        
+        df = generate_demo_data(n_periods=26, seed=42)
+        channels = ['search', 'social']
+        controls = ['price', 'promo']
+        decay = {'search': 0.5, 'social': 0.4}
+        strength = {'search': 1.5, 'social': 1.7}
+        
+        result = fit_bayesian_mmm(
+            df, 'date', 'sales',
+            channels, controls, decay, 8, strength, 1.0,
+            True, 1.0, draws=10, tune=10, seed=42
+        )
+        
+        assert 'idata' in result
+        assert 'beta_draws' in result
+        assert result['beta_draws'].shape[0] > 0
+        print('Smoke test passed!')
+        "
+      env:
+        PYTHONPATH: /home/runner/work/pymc_MMM_workbench/pymc_MMM_workbench
+
+  build-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+        cache: "pip"
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Check Python syntax on all pages
+      run: |
+        python -m py_compile app.py
+        python -m py_compile pages/1_Home.py
+        python -m py_compile pages/2_Data.py
+        python -m py_compile pages/3_Effect_Explorer.py
+        python -m py_compile pages/4_Model.py
+        python -m py_compile pages/5_Scenarios.py
+        python -m py_compile pages/6_Optimization.py
+        python -m py_compile utils/data.py
+        python -m py_compile utils/simulation.py
+        python -m py_compile utils/transformations.py
+        python -m py_compile utils/modeling.py
+        python -m py_compile utils/optimization.py
+        python -m py_compile utils/plotting.py
+        python -m py_compile utils/__init__.py
+        echo "All syntax checks passed!"

@@ -1,7 +1,7 @@
 from __future__ import annotations
 import pandas as pd
 import streamlit as st
-from utils.modeling import generate_demo_data
+from utils.simulation import generate_demo_data
 
 DATE_HINTS = {"date", "week", "day", "ds", "timestamp"}
 TARGET_HINTS = {"sales", "revenue", "conversions", "orders", "target", "outcome"}

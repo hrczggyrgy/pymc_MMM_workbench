@@ -267,7 +267,11 @@ def fit_bayesian_mmm(
     # Posterior summary
     beta_draws = idata.posterior["beta"].stack(sample=("chain", "draw")).transpose("sample", "feature").values
     feature_names = X.columns.tolist()
-    summary = az.summary(idata, var_names=["alpha", "beta", "sigma"], ci_prob=0.9).reset_index().rename(columns={"index": "parameter"})
+    try:
+        summary = az.summary(idata, var_names=["alpha", "beta", "sigma"], hdi_prob=0.9).reset_index().rename(columns={"index": "parameter"})
+    except TypeError:
+        # Fallback for newer arviz versions
+        summary = az.summary(idata, var_names=["alpha", "beta", "sigma"], ci_prob=0.9).reset_index().rename(columns={"index": "parameter"})
 
     # Channel contributions (on original scale)
     contrib = pd.DataFrame(

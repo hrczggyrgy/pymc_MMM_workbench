@@ -2,9 +2,9 @@
 
 A production-quality Streamlit workbench for Bayesian Marketing Mix Modeling. Explore adstock and saturation interactively, fit a real PyMC Bayesian model with full posterior uncertainty, test what-if scenarios, and optimize budget allocation — all in a guided, educational interface.
 
-![Python](https://img.shields.io/badge/python-3.10%2B-blue)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![Streamlit](https://img.shields.io/badge/streamlit-1.35%2B-red)
-![PyMC](https://img.shields.io/badge/pymc-5.10%2B-orange)
+![PyMC](https://img.shields.io/badge/pymc-5.16%2B-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## Features
@@ -14,17 +14,19 @@ A production-quality Streamlit workbench for Bayesian Marketing Mix Modeling. Ex
 | **Home** | Guided overview, workflow, glossary, and quick start |
 | **Data** | CSV upload, schema detection, validation, quick visualizations |
 | **Effect Explorer** | Interactive adstock/saturation curves with live parameter sliders |
-| **Model** | Bayesian MMM with PyMC — posterior summaries, diagnostics, trace plots |
+| **Model** | Bayesian MMM with PyMC — posterior summaries, diagnostics, trace plots, out-of-sample validation |
 | **Scenarios** | What-if spend changes with full posterior lift distributions |
 | **Optimization** | Constrained budget allocation maximizing expected outcome |
 
 ### Key Capabilities
 
 - **Real Bayesian inference** via PyMC (NUTS sampler, 2 chains, R-hat/ESS diagnostics)
-- **Adstock (geometric carryover)** and **Hill saturation (diminishing returns)** with interactive exploration
+- **Per-channel adstock (geometric carryover)** and **Hill saturation (diminishing returns)** with interactive exploration
 - **Full posterior uncertainty** propagated to predictions, scenarios, and optimization
 - **Demo mode** with realistic synthetic data (104 weeks, 4 channels, controls, seasonality)
 - **Constraint-aware optimization** (SLSQP with bounds + equality constraint)
+- **Out-of-sample validation** with holdout metrics (RMSE, MAPE, R²)
+- **Model caching** with `st.cache_resource` for instant re-runs on same config
 - **Exportable results** (CSV allocation, posterior summaries)
 
 ## Quick Start
@@ -45,6 +47,8 @@ streamlit run app.py
 ```
 
 Open http://localhost:8501 — click **"Try Demo Data"** on the Home page to see the full workflow instantly.
+
+**Live demo:** https://pymcmmmworkbench.streamlit.app/
 
 ## Data Format
 
@@ -87,11 +91,14 @@ date,sales,search,social,video,display,price,promo
 - Presets for Search/Video/Display profiles
 
 ### 3. Model → Fit Bayesian MMM
-- Configure: shared decay/strength, prior strength, seasonality, carryover window
+- Configure per-channel decay/strength (or use shared defaults)
+- Set prior strength, seasonality, carryover window
+- Choose holdout fraction for out-of-sample validation
 - Choose **Fast demo** (250 draws) or **Production** (700+ draws)
-- Click **Fit Bayesian MMM** — watch progress spinner
+- Click **Fit Bayesian MMM** — results cached automatically
 - Review:
-  - Observed vs posterior prediction with 90% credible band
+  - Observed vs posterior prediction with 90% credible band (train + test)
+  - Out-of-sample metrics (RMSE, MAPE, R²) if holdout enabled
   - Posterior summary table (R-hat, ESS, HDI)
   - Channel coefficient posterior densities
   - Stacked contribution over time
@@ -124,6 +131,10 @@ date,sales,search,social,video,display,price,promo
 ```
 pymc_MMM_workbench/
 ├── app.py                    # Entry point, page config
+├── runtime.txt               # Python 3.11 for Streamlit Cloud
+├── requirements.txt          # Pinned dependencies
+├── requirements-lock.txt     # Frozen pip freeze for reproducibility
+├── LICENSE                   # MIT License
 ├── pages/                    # Streamlit multipage app
 │   ├── 1_Home.py
 │   ├── 2_Data.py
@@ -136,12 +147,11 @@ pymc_MMM_workbench/
 │   ├── data.py               # Loading, validation, schema detection
 │   ├── simulation.py         # Synthetic data generation (cached)
 │   ├── transformations.py    # Adstock, saturation, marginal response
-│   ├── modeling.py           # PyMC model, fitting, predictions
+│   ├── modeling.py           # PyMC model, fitting, predictions (cached)
 │   ├── optimization.py       # Budget optimization, ROI, response curves
 │   └── plotting.py           # Plotly chart builders (cached)
-├── requirements.txt
-├── .gitignore
-└── README.md
+├── .streamlit/config.toml    # Streamlit theme & server config
+└── .gitignore
 ```
 
 ### Core Modules
@@ -150,7 +160,7 @@ pymc_MMM_workbench/
 |--------|----------------|
 | `simulation.py` | `generate_demo_data()` — realistic synthetic MMM data |
 | `transformations.py` | `geometric_adstock()`, `hill_saturation()`, `marginal_response()` |
-| `modeling.py` | `fit_bayesian_mmm()`, `scenario_lift()`, `response_samples()` |
+| `modeling.py` | `fit_bayesian_mmm()`, `fit_bayesian_mmm_cached()`, `scenario_lift()`, `response_samples()` |
 | `optimization.py` | `optimize_budget()`, `compute_channel_roi()`, `response_curve_data()` |
 | `data.py` | CSV loading, schema detection, validation |
 | `plotting.py` | Reusable Plotly figures with `@st.cache_data` |
@@ -167,7 +177,7 @@ sales_t ~ Normal(μ_t, σ)
 μ_t = α + Σ_c β_c · f_c(spend_c,t) + γ · controls_t + δ · trend_t + seasonality_t
 ```
 
-**Media Transformation (fixed, not estimated):**
+**Media Transformation (fixed hyperparameters, not estimated):**
 ```
 f_c(spend) = Hill( Adstock(spend; λ_c, L) ; α_c, midpoint_c )
 Adstock(spend; λ, L) = Σ_{k=0}^L λ^k · spend_{t-k}
@@ -176,13 +186,18 @@ Hill(x; α, m) = x^α / (x^α + m^α)
 
 **Priors:**
 ```
-α ~ Normal(0, 1.5)           # Intercept (standardized scale)
-β_c ~ Normal(0, prior_scale) # Channel coefficients (standardized scale)
-σ ~ HalfNormal(1)            # Observation noise
+α ~ Normal(0, 1.5)                    # Intercept (standardized scale)
+β_c ~ Normal(0, prior_scale)          # Channel coefficients (standardized scale)
+σ ~ HalfNormal(1)                     # Observation noise
 ```
 
+**Out-of-sample validation:**
+- Chronological train/test split (last `test_size` fraction)
+- Posterior predictive on test set via `sample_posterior_predictive`
+- Metrics: RMSE, MAPE, R² on held-out data
+
 **Notes:**
-- Adstock/saturation parameters (λ, α, midpoint) are **fixed hyperparameters** set in UI, not estimated
+- Adstock/saturation parameters (λ, α, midpoint) are **fixed hyperparameters** set in UI
 - This keeps the model fast and identifiable; for full hierarchical estimation see PyMC-Marketing
 - Features are standardized before regression; coefficients are on standardized scale
 
@@ -194,6 +209,7 @@ Hill(x; α, m) = x^α / (x^α + m^α)
 | Production | 700 | 2 | ~2-4 minutes |
 | Thorough | 2000 | 4 | ~10-15 minutes |
 
+- **Model caching**: Same configuration → instant load via `st.cache_resource`
 - **First run** compiles PyMC model (slower); subsequent runs faster
 - Use `cores=1` for reproducibility; increase for speed if needed
 - For production use: increase draws, check R-hat < 1.01, ESS > 400
@@ -204,7 +220,7 @@ Hill(x; α, m) = x^α / (x^α + m^α)
 
 - **Correlation ≠ Causation**: MMM identifies associations; validate with experiments (geo tests, holdouts)
 - **Data quality is critical**: Spend definitions, aggregation level, missing data all affect results
-- **Model assumptions**: Shared decay/strength, no channel interactions, steady-state optimization
+- **Model assumptions**: Fixed adstock/saturation, no channel interactions, steady-state optimization
 - **Extrapolation risk**: Response curves beyond observed spend range are highly uncertain
 - **Short time series**: <52 weeks → unstable seasonality; <30 weeks → unreliable posteriors
 - **Prior sensitivity**: Check results with different prior scales
@@ -242,28 +258,31 @@ In `prepare_features()`:
 X["search_x_social"] = X["search"] * X["social"]
 ```
 
-## Troubleshooting
+## Testing & CI
 
-| Issue | Solution |
-|-------|----------|
-| `ModuleNotFoundError: pymc` | `pip install pymc>=5.10` (requires Python 3.10+) |
-| Sampling very slow | Reduce draws, use `cores=2`, check for divergences |
-| R-hat > 1.01 | Increase tune/draws, reparameterize, stronger priors |
-| Optimization fails | Check constraint feasibility (min_sum ≤ budget ≤ max_sum) |
-| Demo data not loading | Restart app, check `utils/simulation.py` imports |
-| Charts not rendering | Ensure Plotly 5.18+, clear browser cache |
+```bash
+# Run tests
+pytest tests/
+
+# Lint
+ruff check .
+```
+
+GitHub Actions workflow runs pytest + ruff on every push.
+
+## References & Prior Art
+
+- **PyMC-Marketing** — MMM reference implementation with per-channel hierarchical adstock/saturation
+  - Case study: https://www.pymc-marketing.io/en/0.15.1/notebooks/mmm/mmm_case_study.html
+  - Explainer app: https://pymc-marketing-explainer.streamlit.app/
+- **PyMC** — Bayesian modeling in Python
+- **ArviZ** — Exploratory analysis of Bayesian models
+- **Streamlit** — Rapid data app framework
+- **Plotly** — Interactive visualizations
 
 ## License
 
 MIT License — see [LICENSE](LICENSE) for details.
-
-## Acknowledgments
-
-- [PyMC](https://www.pymc.io/) — Bayesian modeling in Python
-- [PyMC-Marketing](https://github.com/pymc-labs/pymc-marketing) — MMM reference implementation
-- [ArviZ](https://arviz-devs.github.io/arviz/) — Exploratory analysis of Bayesian models
-- [Streamlit](https://streamlit.io/) — Rapid data app framework
-- [Plotly](https://plotly.com/python/) — Interactive visualizations
 
 ---
 

@@ -71,10 +71,17 @@ def prepare_features(
 
     for channel in channels:
         raw = data[channel].clip(lower=0).to_numpy(float)
-        midpoint = max(
-            np.median(raw[raw > 0]) * midpoint_scale if np.any(raw > 0) else 1, 1
-        )
-        media[channel] = transform_media(raw, decay[channel], l_max, strength[channel], midpoint)
+        # Guard against all-zero or all-NaN channels
+        positive_vals = raw[raw > 0]
+        if len(positive_vals) == 0:
+            # All zero channel - use default midpoint and warn
+            midpoint = 1.0
+            media[channel] = np.zeros_like(raw)
+        else:
+            midpoint = max(
+                np.median(positive_vals) * midpoint_scale, 1
+            )
+            media[channel] = transform_media(raw, decay[channel], l_max, strength[channel], midpoint)
         params[channel] = {
             "decay": decay[channel],
             "l_max": l_max,

@@ -172,6 +172,26 @@ class TestOptimizeBudget:
         # At minimum, verify it runs without error
         assert sum(allocation_neutral.values()) == pytest.approx(total_budget, abs=1.0)
         assert sum(allocation_averse.values()) == pytest.approx(total_budget, abs=1.0)
+    
+    def test_inverted_constraints(self):
+        """Test that inverted min/max constraints raise error."""
+        mock = MockResult()
+        total_budget = 23000.0
+        minimums = {"search": 10000.0, "social": 5000.0, "video": 8000.0}
+        maximums = {"search": 5000.0, "social": 3000.0, "video": 4000.0}  # All inverted
+        
+        with pytest.raises(ValueError, match="exceeds maximum"):
+            optimize_budget(total_budget, minimums, maximums, mock, n_draws=50)
+    
+    def test_negative_constraints(self):
+        """Test that negative constraints raise error."""
+        mock = MockResult()
+        total_budget = 23000.0
+        minimums = {"search": -1000.0, "social": 5000.0, "video": 8000.0}
+        maximums = {"search": 20000.0, "social": 10000.0, "video": 15000.0}
+        
+        with pytest.raises(ValueError, match="cannot be negative"):
+            optimize_budget(total_budget, minimums, maximums, mock, n_draws=50)
 
 
 class TestComputeChannelROI:

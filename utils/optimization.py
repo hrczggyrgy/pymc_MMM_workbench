@@ -132,6 +132,17 @@ def optimize_budget(
     lower = np.array([minimums[c] for c in channels])
     upper = np.array([maximums[c] for c in channels])
 
+    # Validate per-channel constraints
+    for c in channels:
+        if minimums[c] > maximums[c]:
+            raise ValueError(
+                f"Minimum spend for channel '{c}' ({minimums[c]:,.0f}) exceeds maximum ({maximums[c]:,.0f})"
+            )
+        if minimums[c] < 0:
+            raise ValueError(f"Minimum spend for channel '{c}' cannot be negative")
+        if maximums[c] < 0:
+            raise ValueError(f"Maximum spend for channel '{c}' cannot be negative")
+
     if lower.sum() > total_budget + 1e-6:
         raise ValueError(
             f"Sum of minimums ({lower.sum():,.0f}) exceeds total budget ({total_budget:,.0f})"

@@ -2,16 +2,16 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 
-from utils.data import ensure_demo_data, set_data, validate_data, detect_schema
+from utils.data import ensure_demo_data, set_data, detect_schema, validate_and_clean_upload
 from utils.simulation import generate_demo_data
 
-st.set_page_config(page_title="Data | MMM Workbench", page_icon="🗂️", layout="wide")
+st.set_page_config(page_title="Data | MMM Workbench", layout="wide")
 ensure_demo_data()
 
 st.title("Data Setup")
 st.caption("Load a time-series CSV or use demo data. Configure column roles and validate.")
 
-with st.expander("📖 Data Requirements", expanded=False):
+with st.expander("Data Requirements", expanded=False):
     st.markdown("""
     **Expected CSV format:**
     - **Date column**: Parseable dates (weekly or daily), one row per period
@@ -40,11 +40,11 @@ if uploaded:
     try:
         df_uploaded = pd.read_csv(uploaded)
         set_data(df_uploaded, uploaded.name)
-        st.success(f"Loaded **{uploaded.name}** ({len(df_uploaded):,} rows, {len(df_uploaded.columns)} columns)")
+        st.toast(f"Loaded {uploaded.name} ({len(df_uploaded):,} rows, {len(df_uploaded.columns)} columns)")
     except Exception as exc:
         st.error(f"Could not read CSV: {exc}")
 
-if st.button("🔄 Reset to Demo Data", use_container_width=True):
+if st.button("Reset to Demo Data", use_container_width=True):
     set_data(generate_demo_data(), "Built-in synthetic demo")
     st.rerun()
 
@@ -98,32 +98,83 @@ controls = st.multiselect(
     help="Confounders: price, promotions, holidays, etc."
 )
 
-# Save configuration
-if st.button("💾 Save Data Configuration", type="primary", use_container_width=True):
+# Save configuration & run full validation
+if st.button("Save Data Configuration", type="primary", use_container_width=True):
     st.session_state.date_col = date_col
     st.session_state.target_col = target_col
     st.session_state.channel_cols = channels
     st.session_state.control_cols = controls
     st.session_state.pop("model_result", None)
-    st.success("Configuration saved! Proceed to **Effect Explorer** or **Model**.")
+    
+    # Run comprehensive validation
+    with st.spinner("Validating and cleaning data..."):
+        result = validate_and_clean_upload(
+            st.session_state.data, date_col, target_col, channels, controls
+        )
+    
+    st.session_state.validation_result = result
+    
+    if result["usable"]:
+        st.toast("Configuration saved! Proceed to Effect Explorer or Model.")
+    else:
+        st.error("Configuration has errors that must be fixed before proceeding.")
 
-# Validation
+# Validation results
 st.markdown("---")
 st.subheader("Data Validation")
-issues = validate_data(df, date_col, target_col, channels)
 
-if not issues:
-    st.success("✅ No issues detected")
+if "validation_result" in st.session_state:
+    result = st.session_state.validation_result
+    
+    # Errors (blocking)
+    if result["errors"]:
+        st.error("**Blocking Errors:**")
+        for err in result["errors"]:
+            st.error(f"- {err}")
+    
+    # Warnings (non-blocking)
+    if result["warnings"]:
+        with st.expander("Warnings", expanded=True):
+            for warn in result["warnings"]:
+                st.warning(f"- {warn}")
+    
+    # Channel info table
+    if result.get("channel_info"):
+        st.subheader("Channel Diagnostics")
+        info_rows = []
+        for col, info in result["channel_info"].items():
+            status = "Excluded" if col in result["excluded_channels"] else "Valid"
+            info_rows.append({
+                "Channel": col,
+                "Status": status,
+                "Missing": f"{info['n_missing']}/{info['n_total']}",
+                "Zeros": info['n_zero'],
+                "Negatives": info['n_negative'],
+                "Mean": f"{info['mean']:,.0f}",
+                "Median": f"{info['median']:,.0f}",
+                "Std": f"{info['std']:,.0f}",
+                "Min": f"{info['min']:,.0f}",
+                "Max": f"{info['max']:,.0f}",
+            })
+        st.dataframe(pd.DataFrame(info_rows), use_container_width=True, hide_index=True)
+    
+    # Excluded channels
+    if result["excluded_channels"]:
+        st.info(f"Excluded channels: {', '.join(result['excluded_channels'])}")
 else:
-    for level, message in issues:
-        getattr(st, level)(message)
+    # Legacy validation
+    issues = validate_data(df, date_col, target_col, channels)
+    if not issues:
+        st.success("No issues detected")
+    else:
+        for level, message in issues:
+            getattr(st, level)(message)
 
 # Quick visualizations
 if len(channels) >= 1:
     st.markdown("---")
     st.subheader("Quick Visualizations")
     
-    # Time series of target
     try:
         dates = pd.to_datetime(df[date_col], errors="coerce")
         df_viz = df.copy()

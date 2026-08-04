@@ -14,8 +14,9 @@ from utils.transformations import (
     effective_spend_range,
 )
 from utils.simulation import generate_channel_response_curve
+from utils.plotting import get_channel_color
 
-st.set_page_config(page_title="Effect Explorer | MMM Workbench", page_icon="🔬", layout="wide")
+st.set_page_config(page_title="Effect Explorer | MMM Workbench", layout="wide")
 ensure_demo_data()
 
 df = configured_data()
@@ -24,7 +25,7 @@ channels = st.session_state.channel_cols
 st.title("Effect Explorer")
 st.caption("Understand how raw spend transforms into modeled media effects through adstock (carryover) and saturation (diminishing returns).")
 
-with st.expander("📖 How to use this page", expanded=False):
+with st.expander("How to use this page", expanded=False):
     st.markdown("""
     **Adstock (Carryover)**: Advertising doesn't just work in the period it runs—it lingers.
     The geometric adstock model assumes each period retains a fraction (`decay`) of the previous period's effect.
@@ -101,6 +102,9 @@ marginal_curve = marginal_response(x_curve, decay, l_max, strength, midpoint)
 # Effective carryover info
 eff_periods = effective_spend_range(decay, l_max)
 
+# Channel color for consistent visual identity
+channel_color = get_channel_color(channel)
+
 # --- Chart 1: Raw vs Adstocked Spend Over Time ---
 st.subheader("1. Adstock: Spend Over Time with Carryover")
 fig1 = make_subplots(specs=[[{"secondary_y": False}]])
@@ -114,7 +118,7 @@ fig1.add_trace(
 fig1.add_trace(
     go.Scatter(
         x=df[st.session_state.date_col], y=adstocked,
-        name="Adstocked spend", line=dict(color="#0F766E", width=3),
+        name="Adstocked spend", line=dict(color=channel_color, width=3),
         hovertemplate="%{x|%b %d, %Y}<br>Adstocked: %{y:,.0f}<extra></extra>"
     )
 )
@@ -135,13 +139,13 @@ with c1:
     **Adstock Effect (λ={decay:.2f}, window={l_max})**
     - Each period retains **{decay:.0%}** of previous period's effect
     - Effective carryover: **{eff_periods} periods** (until effect < 1%)
-    - Total multiplier: **1/(1-λ) = {1/(1-decay+1e-6):.1f}×** at steady state
+    - Total multiplier: **1/(1-λ) = {1/(1-decay+1e-6):.1f}x** at steady state
     - Adstocked spend = raw spend + λ·raw_spend(t-1) + λ²·raw_spend(t-2) + ...
     """)
 with c2:
     # Adstock weight visualization
     weights = decay ** np.arange(l_max + 1)
-    fig_w = go.Figure(go.Bar(x=list(range(l_max + 1)), y=weights, marker_color="#0F766E"))
+    fig_w = go.Figure(go.Bar(x=list(range(l_max + 1)), y=weights, marker_color=channel_color))
     fig_w.update_layout(
         title="Adstock Weights by Lag",
         template="plotly_white",
@@ -160,8 +164,8 @@ with c1:
     fig2 = go.Figure()
     fig2.add_trace(go.Scatter(
         x=x_curve, y=saturated_curve,
-        fill="tozeroy", fillcolor="rgba(15, 118, 110, 0.15)",
-        line=dict(color="#0F766E", width=3),
+        fill="tozeroy", fillcolor=f"rgba{tuple(list(bytes.fromhex(channel_color[1:])) + [0.15])}",
+        line=dict(color=channel_color, width=3),
         name="Response",
         hovertemplate="Spend: %{x:,.0f}<br>Response: %{y:.3f}<extra></extra>"
     ))
@@ -221,12 +225,12 @@ st.info(f"""
 """)
 
 # --- Chart 3: Full Transformation Pipeline ---
-st.subheader("3. Complete Pipeline: Raw Spend → Modeled Effect")
+st.subheader("3. Complete Pipeline: Raw Spend to Modeled Effect")
 fig4 = make_subplots(rows=1, cols=3, subplot_titles=("Raw Spend", "Adstocked", "Saturated (Model Input)"),
                      horizontal_spacing=0.08)
 
 fig4.add_trace(go.Histogram(x=raw, nbinsx=30, name="Raw", marker_color="#94A3B8", showlegend=False), row=1, col=1)
-fig4.add_trace(go.Histogram(x=adstocked, nbinsx=30, name="Adstocked", marker_color="#0F766E", showlegend=False), row=1, col=2)
+fig4.add_trace(go.Histogram(x=adstocked, nbinsx=30, name="Adstocked", marker_color=channel_color, showlegend=False), row=1, col=2)
 fig4.add_trace(go.Histogram(x=transformed, nbinsx=30, name="Saturated", marker_color="#4C72B0", showlegend=False), row=1, col=3)
 
 fig4.update_layout(

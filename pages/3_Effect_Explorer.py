@@ -20,7 +20,8 @@ st.set_page_config(page_title="Effect Explorer | MMM Workbench", page_icon=":mat
 ensure_demo_data()
 
 # Lazy import plotting functions
-_, _, get_channel_color, *_ = _lazy_import_plotting()
+_p = _lazy_import_plotting()
+get_channel_color = _p["get_channel_color"]
 
 df = configured_data()
 channels = st.session_state.channel_cols

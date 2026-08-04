@@ -31,15 +31,15 @@ def _lazy_import_plotting():
         response_curve_plot,
         posterior_density_plot,
     )
-    return (
-        line_with_band,
-        allocation_chart,
-        get_channel_color,
-        get_channel_colors,
-        CHANNEL_COLORS,
-        response_curve_plot,
-        posterior_density_plot,
-    )
+    return {
+        "line_with_band": line_with_band,
+        "allocation_chart": allocation_chart,
+        "get_channel_color": get_channel_color,
+        "get_channel_colors": get_channel_colors,
+        "CHANNEL_COLORS": CHANNEL_COLORS,
+        "response_curve_plot": response_curve_plot,
+        "posterior_density_plot": posterior_density_plot,
+    }
 
 # Lazy imports for modeling and optimization (require pymc/arviz)
 def _lazy_import_modeling():
@@ -50,7 +50,13 @@ def _lazy_import_modeling():
         scenario_lift,
         prepare_features,
     )
-    return fit_bayesian_mmm, fit_bayesian_mmm_cached, response_samples, scenario_lift, prepare_features
+    return {
+        "fit_bayesian_mmm": fit_bayesian_mmm,
+        "fit_bayesian_mmm_cached": fit_bayesian_mmm_cached,
+        "response_samples": response_samples,
+        "scenario_lift": scenario_lift,
+        "prepare_features": prepare_features,
+    }
 
 def _lazy_import_optimization():
     from utils.optimization import (
@@ -58,7 +64,11 @@ def _lazy_import_optimization():
         compute_channel_roi,
         response_curve_data,
     )
-    return optimize_budget, compute_channel_roi, response_curve_data
+    return {
+        "optimize_budget": optimize_budget,
+        "compute_channel_roi": compute_channel_roi,
+        "response_curve_data": response_curve_data,
+    }
 
 
 __all__ = [

@@ -286,9 +286,5 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-**Built for analysts and stakeholders who want to understand, not just use, their marketing mix model.**# Force rebuild
-# Force rebuild Tue Aug  4 05:01:15 PM CEST 2026
-# Rebuild Tue Aug  4 05:02:48 PM CEST 2026
-# Rebuild 
-# Rebuild Tue Aug  4 05:10:52 PM CEST 2026
-# Force rebuild Tue Aug  4 05:12:40 PM CEST 2026
+**Built for analysts and stakeholders who want to understand, not just use, their marketing mix model.**
+# Rebuild Tue Aug  4 05:33:13 PM CEST 2026

@@ -12,8 +12,12 @@ st.set_page_config(page_title="Model | MMM Workbench", page_icon=":material/psyc
 ensure_demo_data()
 
 # Lazy imports
-fit_bayesian_mmm, fit_bayesian_mmm_cached, *_ = _lazy_import_modeling()
-line_with_band, *_ = _lazy_import_plotting()
+_m_model = _lazy_import_modeling()
+fit_bayesian_mmm = _m_model["fit_bayesian_mmm"]
+fit_bayesian_mmm_cached = _m_model["fit_bayesian_mmm_cached"]
+
+_m_plot = _lazy_import_plotting()
+line_with_band = _m_plot["line_with_band"]
 
 df = configured_data()
 channels = st.session_state.channel_cols

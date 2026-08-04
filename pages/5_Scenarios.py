@@ -166,15 +166,15 @@ fig_spend.update_layout(
 st.plotly_chart(fig_spend, use_container_width=True)
 
 # Change table
-    compare_df_fmt = compare_df.copy()
-    compare_df_fmt["Baseline"] = compare_df_fmt["Baseline"].apply(lambda x: f"${x:,.0f}")
-    compare_df_fmt["Scenario"] = compare_df_fmt["Scenario"].apply(lambda x: f"${x:,.0f}")
-    compare_df_fmt["Change"] = compare_df_fmt["Change"].apply(lambda x: f"${x:+,.0f}")
-    compare_df_fmt["Change %"] = compare_df_fmt["Change %"].apply(lambda x: f"{x:+.1f}%")
-    st.dataframe(
-        compare_df_fmt,
-        use_container_width=True, hide_index=True
-    )
+compare_df_fmt = compare_df.copy()
+compare_df_fmt["Baseline"] = compare_df_fmt["Baseline"].apply(lambda x: f"${x:,.0f}")
+compare_df_fmt["Scenario"] = compare_df_fmt["Scenario"].apply(lambda x: f"${x:,.0f}")
+compare_df_fmt["Change"] = compare_df_fmt["Change"].apply(lambda x: f"${x:+,.0f}")
+compare_df_fmt["Change %"] = compare_df_fmt["Change %"].apply(lambda x: f"{x:+.1f}%")
+st.dataframe(
+    compare_df_fmt,
+    use_container_width=True, hide_index=True
+)
 
 # --- Visualization 2: Lift Distribution ---
 st.subheader("Incremental Lift Distribution")
@@ -243,15 +243,15 @@ fig_decomp.update_layout(
 )
 st.plotly_chart(fig_decomp, use_container_width=True)
 
-    decomp_df_fmt = decomp_df.copy()
-    decomp_df_fmt["Mean Lift"] = decomp_df_fmt["Mean Lift"].apply(lambda x: f"{x:,.0f}")
-    decomp_df_fmt["5%"] = decomp_df_fmt["5%"].apply(lambda x: f"{x:,.0f}")
-    decomp_df_fmt["95%"] = decomp_df_fmt["95%"].apply(lambda x: f"{x:,.0f}")
-    decomp_df_fmt["P(Positive)"] = decomp_df_fmt["P(Positive)"].apply(lambda x: f"{x:.1%}")
-    st.dataframe(
-        decomp_df_fmt,
-        use_container_width=True, hide_index=True
-    )
+decomp_df_fmt = decomp_df.copy()
+decomp_df_fmt["Mean Lift"] = decomp_df_fmt["Mean Lift"].apply(lambda x: f"{x:,.0f}")
+decomp_df_fmt["5%"] = decomp_df_fmt["5%"].apply(lambda x: f"{x:,.0f}")
+decomp_df_fmt["95%"] = decomp_df_fmt["95%"].apply(lambda x: f"{x:,.0f}")
+decomp_df_fmt["P(Positive)"] = decomp_df_fmt["P(Positive)"].apply(lambda x: f"{x:.1%}")
+st.dataframe(
+    decomp_df_fmt,
+    use_container_width=True, hide_index=True
+)
 
 # --- Visualization 4: Response Curves with Scenario Points ---
 st.subheader("Response Curves with Scenario Position")

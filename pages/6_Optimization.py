@@ -166,13 +166,15 @@ for c in channels:
     })
 
 alloc_df = pd.DataFrame(table_data)
-st.dataframe(
-    alloc_df.style.format({
-        "Current": "${:,.0f}", "Recommended": "${:,.0f}",
-        "Change ($)": "${:+,.0f}", "Change (%)": "{:+.1f}%"
-    }).background_gradient(subset=["Change ($)"], cmap="RdYlGn"),
-    use_container_width=True, hide_index=True
-)
+    alloc_df_fmt = alloc_df.copy()
+    alloc_df_fmt["Current"] = alloc_df_fmt["Current"].apply(lambda x: f"${x:,.0f}")
+    alloc_df_fmt["Recommended"] = alloc_df_fmt["Recommended"].apply(lambda x: f"${x:,.0f}")
+    alloc_df_fmt["Change ($)"] = alloc_df_fmt["Change ($)"].apply(lambda x: f"${x:+,.0f}")
+    alloc_df_fmt["Change (%)"] = alloc_df_fmt["Change (%)"].apply(lambda x: f"{x:+.1f}%")
+    st.dataframe(
+        alloc_df_fmt,
+        use_container_width=True, hide_index=True
+    )
 
 # --- Allocation Bar Chart ---
 fig_alloc = go.Figure()
@@ -197,19 +199,23 @@ st.subheader("Channel ROI at Recommended Allocation")
 roi_df = compute_channel_roi(allocation, result, n_draws=300)
 
 # Add current ROI for comparison
-roi_current = compute_channel_roi(current_spend, result, n_draws=300)
-roi_df["Current_ROI"] = roi_current["ROI"].values
-roi_df["Current_Marginal_ROAS"] = roi_current["Marginal_ROAS"].values
-roi_df["Current_Spend"] = roi_current["Spend"].values
+    roi_current = compute_channel_roi(current_spend, result, n_draws=300)
+    roi_df["Current_ROI"] = roi_current["ROI"].values
+    roi_df["Current_Marginal_ROAS"] = roi_current["Marginal_ROAS"].values
+    roi_df["Current_Spend"] = roi_current["Spend"].values
 
-st.dataframe(
-    roi_df.style.format({
-        "Spend": "${:,.0f}", "Expected_Response": "{:,.0f}",
-        "ROI": "{:.2f}", "Marginal_ROAS": "{:.2f}",
-        "Current_ROI": "{:.2f}", "Current_Marginal_ROAS": "{:.2f}", "Current_Spend": "${:,.0f}"
-    }).background_gradient(subset=["ROI", "Marginal_ROAS"], cmap="RdYlGn"),
-    use_container_width=True, hide_index=True
-)
+    roi_df_fmt = roi_df.copy()
+    roi_df_fmt["Spend"] = roi_df_fmt["Spend"].apply(lambda x: f"${x:,.0f}")
+    roi_df_fmt["Expected_Response"] = roi_df_fmt["Expected_Response"].apply(lambda x: f"{x:,.0f}")
+    roi_df_fmt["ROI"] = roi_df_fmt["ROI"].apply(lambda x: f"{x:.2f}")
+    roi_df_fmt["Marginal_ROAS"] = roi_df_fmt["Marginal_ROAS"].apply(lambda x: f"{x:.2f}")
+    roi_df_fmt["Current_ROI"] = roi_df_fmt["Current_ROI"].apply(lambda x: f"{x:.2f}")
+    roi_df_fmt["Current_Marginal_ROAS"] = roi_df_fmt["Current_Marginal_ROAS"].apply(lambda x: f"{x:.2f}")
+    roi_df_fmt["Current_Spend"] = roi_df_fmt["Current_Spend"].apply(lambda x: f"${x:,.0f}")
+    st.dataframe(
+        roi_df_fmt,
+        use_container_width=True, hide_index=True
+    )
 
 # ROI interpretation
 st.markdown("""

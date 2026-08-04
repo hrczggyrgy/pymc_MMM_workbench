@@ -127,18 +127,27 @@ beta_rows["channel"] = beta_rows["parameter"].str.extract(r"beta\[(.*?)\]")
 # Add channel mapping
 channel_map = {c: c for c in channels}
 for idx, row in beta_rows.iterrows():
-    feat = row["channel"]
+feat = row["channel"]
     if feat in result["features"]:
         beta_rows.at[idx, "feature"] = feat
 
-st.dataframe(
-    summary.style.format({
-        "mean": "{:.3f}", "sd": "{:.3f}", "hdi_3%": "{:.3f}", "hdi_97%": "{:.3f}",
-        "mcse_mean": "{:.4f}", "mcse_sd": "{:.4f}", "ess_bulk": "{:.0f}",
-        "ess_tail": "{:.0f}", "r_hat": "{:.3f}"
-    }),
-    use_container_width=True, hide_index=True
-)
+    summary_fmt = summary.copy()
+    for col in ["mean", "sd", "hdi_3%", "hdi_97%"]:
+        if col in summary_fmt.columns:
+            summary_fmt[col] = summary_fmt[col].apply(lambda x: f"{x:.3f}")
+    for col in ["mcse_mean", "mcse_sd"]:
+        if col in summary_fmt.columns:
+            summary_fmt[col] = summary_fmt[col].apply(lambda x: f"{x:.4f}")
+    for col in ["ess_bulk", "ess_tail"]:
+        if col in summary_fmt.columns:
+            summary_fmt[col] = summary_fmt[col].apply(lambda x: f"{x:.0f}")
+    if "r_hat" in summary_fmt.columns:
+        summary_fmt["r_hat"] = summary_fmt["r_hat"].apply(lambda x: f"{x:.3f}")
+
+    st.dataframe(
+        summary_fmt,
+        use_container_width=True, hide_index=True
+    )
 
 # --- 3. Channel Coefficient Posteriors ---
 st.subheader("3. Channel Effect Posteriors (β coefficients)")

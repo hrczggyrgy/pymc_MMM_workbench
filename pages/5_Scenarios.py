@@ -166,10 +166,15 @@ fig_spend.update_layout(
 st.plotly_chart(fig_spend, use_container_width=True)
 
 # Change table
-st.dataframe(
-    compare_df.style.format({"Baseline": "${:,.0f}", "Scenario": "${:,.0f}", "Change": "${:+,0f}", "Change %": "{:+.1f}%"}),
-    use_container_width=True, hide_index=True
-)
+    compare_df_fmt = compare_df.copy()
+    compare_df_fmt["Baseline"] = compare_df_fmt["Baseline"].apply(lambda x: f"${x:,.0f}")
+    compare_df_fmt["Scenario"] = compare_df_fmt["Scenario"].apply(lambda x: f"${x:,.0f}")
+    compare_df_fmt["Change"] = compare_df_fmt["Change"].apply(lambda x: f"${x:+,.0f}")
+    compare_df_fmt["Change %"] = compare_df_fmt["Change %"].apply(lambda x: f"{x:+.1f}%")
+    st.dataframe(
+        compare_df_fmt,
+        use_container_width=True, hide_index=True
+    )
 
 # --- Visualization 2: Lift Distribution ---
 st.subheader("Incremental Lift Distribution")
@@ -238,10 +243,15 @@ fig_decomp.update_layout(
 )
 st.plotly_chart(fig_decomp, use_container_width=True)
 
-st.dataframe(
-    decomp_df.style.format({"Mean Lift": "{:,.0f}", "5%": "{:,.0f}", "95%": "{:,.0f}", "P(Positive)": "{:.1%}"}),
-    use_container_width=True, hide_index=True
-)
+    decomp_df_fmt = decomp_df.copy()
+    decomp_df_fmt["Mean Lift"] = decomp_df_fmt["Mean Lift"].apply(lambda x: f"{x:,.0f}")
+    decomp_df_fmt["5%"] = decomp_df_fmt["5%"].apply(lambda x: f"{x:,.0f}")
+    decomp_df_fmt["95%"] = decomp_df_fmt["95%"].apply(lambda x: f"{x:,.0f}")
+    decomp_df_fmt["P(Positive)"] = decomp_df_fmt["P(Positive)"].apply(lambda x: f"{x:.1%}")
+    st.dataframe(
+        decomp_df_fmt,
+        use_container_width=True, hide_index=True
+    )
 
 # --- Visualization 4: Response Curves with Scenario Points ---
 st.subheader("Response Curves with Scenario Position")
@@ -303,12 +313,14 @@ if st.button("Save scenario for comparison", type="secondary"):
     st.success("Scenario saved!")
 
 # Show saved scenarios
-if "saved_scenarios" in st.session_state and st.session_state.saved_scenarios:
-    st.subheader("Saved Scenarios Comparison")
-    saved_df = pd.DataFrame(st.session_state.saved_scenarios)
-    st.dataframe(
-        saved_df[["name", "lift_mean", "lift_low", "lift_high"]].style.format({
-            "lift_mean": "{:,.0f}", "lift_low": "{:,.0f}", "lift_high": "{:,.0f}"
-        }),
-        use_container_width=True, hide_index=True
-    )
+    if "saved_scenarios" in st.session_state and st.session_state.saved_scenarios:
+        st.subheader("Saved Scenarios Comparison")
+        saved_df = pd.DataFrame(st.session_state.saved_scenarios)
+        saved_df_fmt = saved_df[["name", "lift_mean", "lift_low", "lift_high"]].copy()
+        saved_df_fmt["lift_mean"] = saved_df_fmt["lift_mean"].apply(lambda x: f"{x:,.0f}")
+        saved_df_fmt["lift_low"] = saved_df_fmt["lift_low"].apply(lambda x: f"{x:,.0f}")
+        saved_df_fmt["lift_high"] = saved_df_fmt["lift_high"].apply(lambda x: f"{x:,.0f}")
+        st.dataframe(
+            saved_df_fmt,
+            use_container_width=True, hide_index=True
+        )
